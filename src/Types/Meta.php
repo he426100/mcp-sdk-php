@@ -35,6 +35,16 @@ namespace Mcp\Types;
 class Meta implements McpModel {
     use ExtraFieldsTrait;
 
+    public static function fromArray(array $data): self {
+        $obj = new self();
+        foreach ($data as $k => $v) {
+            $obj->$k = $v;
+        }
+
+        $obj->validate();
+        return $obj;
+    }
+
     public function validate(): void {
         // No required fields, just arbitrary data allowed
     }

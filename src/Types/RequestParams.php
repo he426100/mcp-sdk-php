@@ -39,6 +39,24 @@ class RequestParams implements McpModel {
         public ?Meta $_meta = null,
     ) {}
 
+    public static function fromArray(array $data): self {
+        $meta = null;
+        if (isset($data['_meta']) && is_array($data['_meta'])) {
+            $meta = Meta::FromArray($data['_meta']);
+        }
+
+        $params = new self(_meta: $meta);
+
+        // Assign other parameters dynamically
+        foreach ($data as $key => $value) {
+            if ($key !== '_meta') {
+                $params->$key = $value;
+            }
+        }
+
+        return $params;
+    }
+
     public function validate(): void {
         // No mandatory fields, just arbitrary data.
         // _meta, if present, should be validated.

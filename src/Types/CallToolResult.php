@@ -34,7 +34,8 @@ namespace Mcp\Types;
  * content: (TextContent|ImageContent|EmbeddedResource)[]
  * isError?: boolean
  */
-class CallToolResult extends Result {
+class CallToolResult extends Result
+{
     /**
      * @param (TextContent|ImageContent|EmbeddedResource)[] $content
      */
@@ -46,7 +47,8 @@ class CallToolResult extends Result {
         parent::__construct($_meta);
     }
 
-    public static function fromResponseData(array $data): self {
+    public static function fromResponseData(array $data): self
+    {
         // _meta
         $meta = null;
         if (isset($data['_meta'])) {
@@ -69,7 +71,7 @@ class CallToolResult extends Result {
             }
 
             $type = $item['type'];
-            $content[] = match($type) {
+            $content[] = match ($type) {
                 'text' => TextContent::fromArray($item),
                 'image' => ImageContent::fromArray($item),
                 'resource' => EmbeddedResource::fromArray($item),
@@ -88,7 +90,8 @@ class CallToolResult extends Result {
         return $obj;
     }
 
-    public function validate(): void {
+    public function validate(): void
+    {
         parent::validate();
         foreach ($this->content as $item) {
             if (!($item instanceof TextContent || $item instanceof ImageContent || $item instanceof EmbeddedResource)) {
@@ -96,5 +99,11 @@ class CallToolResult extends Result {
             }
             $item->validate();
         }
+    }
+
+    public function jsonSerialize(): mixed
+    {
+        $data = parent::jsonSerialize();
+        return array_filter($data);
     }
 }

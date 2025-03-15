@@ -92,6 +92,6 @@ class InitializeResult extends Result {
         if ($this->instructions !== null) {
             $data['instructions'] = $this->instructions;
         }
-        return $data;
+        return array_filter($data);
     }
 }

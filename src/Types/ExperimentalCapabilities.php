@@ -33,10 +33,12 @@ namespace Mcp\Types;
  * Represents the `experimental` object in capabilities.
  * This is an open object: { [key: string]: object }, so we just allow arbitrary fields.
  */
-class ExperimentalCapabilities implements McpModel {
+class ExperimentalCapabilities implements McpModel
+{
     use ExtraFieldsTrait;
 
-    public static function fromArray(array $data): self {
+    public static function fromArray(array $data): self
+    {
         $obj = new self();
         // All fields go to extraFields
         foreach ($data as $k => $v) {
@@ -47,12 +49,14 @@ class ExperimentalCapabilities implements McpModel {
         return $obj;
     }
 
-    public function validate(): void {
+    public function validate(): void
+    {
         // No required fields.
     }
 
-    public function jsonSerialize(): mixed {
+    public function jsonSerialize(): mixed
+    {
         // Just return extra fields
-        return $this->extraFields;
+        return $this->extraFields ?: new \stdClass;
     }
 }

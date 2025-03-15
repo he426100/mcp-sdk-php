@@ -42,6 +42,7 @@ use Mcp\Types\JSONRPCError;
 use Mcp\Types\RequestParams;
 use Mcp\Types\NotificationParams;
 use Mcp\Types\Result;
+use Mcp\Types\Meta;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Ratchet\MessageComponentInterface;
@@ -59,16 +60,17 @@ use InvalidArgumentException;
  * converts them to typed objects, and passes them to the session.
  * writeMessage() broadcasts messages to all connected clients.
  */
-class WebSocketServerTransport implements Transport, MessageComponentInterface, WsServerInterface {
+class WebSocketServerTransport implements Transport, MessageComponentInterface, WsServerInterface
+{
     /** @var array<string, ConnectionInterface> */
     private array $connections = [];
-    
+
     /** @var BaseSession|null */
     private ?BaseSession $session = null;
-    
+
     /** @var bool */
     private bool $isStarted = false;
-    
+
     /** @var LoggerInterface */
     private LoggerInterface $logger;
 
@@ -90,7 +92,8 @@ class WebSocketServerTransport implements Transport, MessageComponentInterface, 
      *
      * @return void
      */
-    public function start(): void {
+    public function start(): void
+    {
         if ($this->isStarted) {
             throw new RuntimeException('Transport already started');
         }
@@ -108,7 +111,8 @@ class WebSocketServerTransport implements Transport, MessageComponentInterface, 
      *
      * @return void
      */
-    public function stop(): void {
+    public function stop(): void
+    {
         if (!$this->isStarted) {
             return;
         }
@@ -128,7 +132,8 @@ class WebSocketServerTransport implements Transport, MessageComponentInterface, 
      *
      * @return void
      */
-    public function attachSession(BaseSession $session): void {
+    public function attachSession(BaseSession $session): void
+    {
         $this->session = $session;
         $this->logger->debug('Session attached to WebSocket transport');
     }
@@ -140,7 +145,8 @@ class WebSocketServerTransport implements Transport, MessageComponentInterface, 
      *
      * @return void
      */
-    public function onOpen(ConnectionInterface $conn): void {
+    public function onOpen(ConnectionInterface $conn): void
+    {
         $connId = spl_object_hash($conn);
         $this->connections[$connId] = $conn;
 
@@ -159,7 +165,8 @@ class WebSocketServerTransport implements Transport, MessageComponentInterface, 
      *
      * @return void
      */
-    public function onMessage(ConnectionInterface $from, $msg): void {
+    public function onMessage(ConnectionInterface $from, $msg): void
+    {
         try {
             $data = json_decode($msg, true, 512, JSON_THROW_ON_ERROR);
         } catch (\JsonException $e) {
@@ -215,7 +222,8 @@ class WebSocketServerTransport implements Transport, MessageComponentInterface, 
      *
      * @return void
      */
-    public function onClose(ConnectionInterface $conn): void {
+    public function onClose(ConnectionInterface $conn): void
+    {
         $connId = spl_object_hash($conn);
         unset($this->connections[$connId]);
         $this->logger->debug("WebSocket connection closed: $connId");
@@ -229,7 +237,8 @@ class WebSocketServerTransport implements Transport, MessageComponentInterface, 
      *
      * @return void
      */
-    public function onError(ConnectionInterface $conn, \Exception $e): void {
+    public function onError(ConnectionInterface $conn, \Exception $e): void
+    {
         $connId = spl_object_hash($conn);
         $this->logger->error("Error on WebSocket connection $connId: " . $e->getMessage());
         $conn->close();
@@ -244,7 +253,8 @@ class WebSocketServerTransport implements Transport, MessageComponentInterface, 
      *
      * @return void
      */
-    public function writeMessage(JsonRpcMessage $message): void {
+    public function writeMessage(JsonRpcMessage $message): void
+    {
         if (!$this->isStarted) {
             throw new RuntimeException('Transport not started');
         }
@@ -304,7 +314,8 @@ class WebSocketServerTransport implements Transport, MessageComponentInterface, 
      *
      * @return JsonRpcMessage|null Always returns null.
      */
-    public function readMessage(): ?JsonRpcMessage {
+    public function readMessage(): ?JsonRpcMessage
+    {
         // WebSocket messages are handled via onMessage callback
         return null;
     }
@@ -319,10 +330,11 @@ class WebSocketServerTransport implements Transport, MessageComponentInterface, 
      *
      * @return void
      */
-    private function sendError(ConnectionInterface $conn, int $code, string $message, ?RequestId $id = null): void {
+    private function sendError(ConnectionInterface $conn, int $code, string $message, ?RequestId $id = null): void
+    {
         $errorPayload = [
             'jsonrpc' => '2.0',
-            'id' => $id ? $id->toString() : null,
+            'id' => $id ? (string)$id : null,
             'error' => [
                 'code' => $code,
                 'message' => $message,
@@ -353,7 +365,8 @@ class WebSocketServerTransport implements Transport, MessageComponentInterface, 
      *
      * @return JsonRpcMessage The constructed JsonRpcMessage object.
      */
-    private function buildMessage(array $data, bool $hasMethod, bool $hasId, bool $hasResult, bool $hasError, ?RequestId $id): JsonRpcMessage {
+    private function buildMessage(array $data, bool $hasMethod, bool $hasId, bool $hasResult, bool $hasError, ?RequestId $id): JsonRpcMessage
+    {
         if ($hasError) {
             // It's a JSONRPCError
             $errorData = $data['error'];
@@ -381,7 +394,7 @@ class WebSocketServerTransport implements Transport, MessageComponentInterface, 
         } elseif ($hasMethod && $hasId && !$hasResult) {
             // It's a JSONRPCRequest
             $method = $data['method'];
-            $params = isset($data['params']) && is_array($data['params']) ? $this->parseRequestParams($data['params']) : null;
+            $params = isset($data['params']) && is_array($data['params']) ? RequestParams::fromArray($data['params']) : null;
 
             $req = new JSONRPCRequest(
                 jsonrpc: '2.0',
@@ -395,7 +408,7 @@ class WebSocketServerTransport implements Transport, MessageComponentInterface, 
         } elseif ($hasMethod && !$hasId && !$hasResult && !$hasError) {
             // It's a JSONRPCNotification
             $method = $data['method'];
-            $params = isset($data['params']) && is_array($data['params']) ? $this->parseNotificationParams($data['params']) : null;
+            $params = isset($data['params']) && is_array($data['params']) ? NotificationParams::fromArray($data['params']) : null;
 
             $not = new JSONRPCNotification(
                 jsonrpc: '2.0',
@@ -427,69 +440,20 @@ class WebSocketServerTransport implements Transport, MessageComponentInterface, 
     }
 
     /**
-     * Parses request parameters from an associative array.
-     *
-     * @param array $paramsArr The parameters array from the JSON-RPC request.
-     *
-     * @return RequestParams The constructed RequestParams object.
-     */
-    private function parseRequestParams(array $paramsArr): RequestParams {
-        $meta = null;
-        if (isset($paramsArr['_meta']) && is_array($paramsArr['_meta'])) {
-            $meta = $this->metaFromArray($paramsArr['_meta']);
-        }
-
-        $params = new RequestParams($_meta: $meta);
-
-        // Assign other parameters dynamically
-        foreach ($paramsArr as $key => $value) {
-            if ($key !== '_meta') {
-                $params->$key = $value;
-            }
-        }
-
-        return $params;
-    }
-
-    /**
-     * Parses notification parameters from an associative array.
-     *
-     * @param array $paramsArr The parameters array from the JSON-RPC notification.
-     *
-     * @return NotificationParams The constructed NotificationParams object.
-     */
-    private function parseNotificationParams(array $paramsArr): NotificationParams {
-        $meta = null;
-        if (isset($paramsArr['_meta']) && is_array($paramsArr['_meta'])) {
-            $meta = $this->metaFromArray($paramsArr['_meta']);
-        }
-
-        $params = new NotificationParams($_meta: $meta);
-
-        // Assign other parameters dynamically
-        foreach ($paramsArr as $key => $value) {
-            if ($key !== '_meta') {
-                $params->$key = $value;
-            }
-        }
-
-        return $params;
-    }
-
-    /**
      * Builds a Result object from an associative array.
      *
      * @param array $resultData The result data array from the JSON-RPC response.
      *
      * @return Result The constructed Result object.
      */
-    private function buildResult(array $resultData): Result {
+    private function buildResult(array $resultData): Result
+    {
         $meta = null;
         if (isset($resultData['_meta']) && is_array($resultData['_meta'])) {
-            $meta = $this->metaFromArray($resultData['_meta']);
+            $meta = Meta::FromArray($resultData['_meta']);
         }
 
-        $result = new Result($_meta: $meta);
+        $result = new Result(_meta: $meta);
 
         // Assign other result fields dynamically
         foreach ($resultData as $key => $value) {
@@ -499,20 +463,5 @@ class WebSocketServerTransport implements Transport, MessageComponentInterface, 
         }
 
         return $result;
-    }
-
-    /**
-     * Converts a meta array into a Meta object.
-     *
-     * @param array $metaArr The meta information array.
-     *
-     * @return \Mcp\Types\Meta The constructed Meta object.
-     */
-    private function metaFromArray(array $metaArr): \Mcp\Types\Meta {
-        $meta = new \Mcp\Types\Meta();
-        foreach ($metaArr as $key => $value) {
-            $meta->$key = $value;
-        }
-        return $meta;
     }
 }

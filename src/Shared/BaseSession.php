@@ -40,6 +40,9 @@ use Mcp\Types\JSONRPCResponse;
 use Mcp\Types\JSONRPCError;
 use Mcp\Types\McpModel;
 use Mcp\Shared\McpError;
+use Mcp\Types\JsonRpcErrorObject;
+use Mcp\Types\NotificationParams;
+use Mcp\Types\ProgressNotificationParams;
 use InvalidArgumentException;
 use RuntimeException;
 
@@ -51,14 +54,15 @@ use RuntimeException;
  *
  * Subclasses should implement the abstract methods to handle I/O and message processing.
  */
-abstract class BaseSession {
+abstract class BaseSession
+{
     protected bool $isInitialized = false;
     /** @var array<int, callable(JsonRpcMessage):void> */
-    private array $responseHandlers = [];
+    protected array $responseHandlers = [];
     /** @var callable[] */
-    private array $requestHandlers = [];
+    protected array $requestHandlers = [];
     /** @var callable[] */
-    private array $notificationHandlers = [];
+    protected array $notificationHandlers = [];
     private int $requestId = 0;
 
     /**
@@ -73,7 +77,8 @@ abstract class BaseSession {
     /**
      * Initializes the session and starts message processing.
      */
-    public function initialize(): void {
+    public function initialize(): void
+    {
         if ($this->isInitialized) {
             throw new RuntimeException('Session already initialized');
         }
@@ -84,14 +89,16 @@ abstract class BaseSession {
     /**
      * Checks if the session is initialized.
      */
-    public function isInitialized(): bool {
+    public function isInitialized(): bool
+    {
         return $this->isInitialized;
     }
 
     /**
      * Closes the session and stops message processing.
      */
-    public function close(): void {
+    public function close(): void
+    {
         if (!$this->isInitialized) {
             return;
         }
@@ -106,7 +113,8 @@ abstract class BaseSession {
      * @return McpModel The validated result object.
      * @throws McpError If an error response is received.
      */
-    public function sendRequest(McpModel $request, string $resultType): McpModel {
+    public function sendRequest(McpModel $request, string $resultType): McpModel
+    {
         $this->validateRequestObject($request);
 
         $requestIdValue = $this->requestId++;
@@ -158,7 +166,8 @@ abstract class BaseSession {
      * Sends a notification. Notifications do not expect a response.
      * @param McpModel $notification A typed notification object.
      */
-    public function sendNotification(McpModel $notification): void {
+    public function sendNotification(McpModel $notification): void
+    {
         // Convert the typed notification into a JSON-RPC notification message
         $jsonRpcNotification = new JSONRPCNotification(
             jsonrpc: '2.0',
@@ -176,7 +185,8 @@ abstract class BaseSession {
      * @param RequestId $requestId The request ID to respond to.
      * @param McpModel|ErrorData $response Either a typed result model or an ErrorData for an error response.
      */
-    public function sendResponse(RequestId $requestId, mixed $response): void {
+    public function sendResponse(RequestId $requestId, mixed $response): void
+    {
         if ($response instanceof ErrorData) {
             // Error response
             $jsonRpcError = new JSONRPCError(
@@ -211,20 +221,20 @@ abstract class BaseSession {
         float $progress,
         ?float $total = null
     ): void {
-        $progressNotification = new ProgressNotification(
+        $progressNotification = new ProgressNotification(new ProgressNotificationParams(
             progressToken: $progressToken,
             progress: $progress,
             total: $total
-        );
+        ));
 
         $jsonRpcNotification = new JSONRPCNotification(
             jsonrpc: '2.0',
             method: $progressNotification->method,
-            params: [
+            params: NotificationParams::fromArray([
                 'progressToken' => $progressToken,
                 'progress' => $progress,
                 'total' => $total
-            ]
+            ])
         );
 
         $jsonRpcMessage = new JsonRpcMessage($jsonRpcNotification);
@@ -236,14 +246,16 @@ abstract class BaseSession {
      * Registers a callback to handle incoming requests.
      * The callback will receive a RequestResponder as argument.
      */
-    public function onRequest(callable $handler): void {
+    public function onRequest(callable $handler): void
+    {
         $this->requestHandlers[] = $handler;
     }
 
     /**
      * Registers a callback to handle incoming notifications.
      */
-    public function onNotification(callable $handler): void {
+    public function onNotification(callable $handler): void
+    {
         $this->notificationHandlers[] = $handler;
     }
 
@@ -251,7 +263,8 @@ abstract class BaseSession {
      * Handles an incoming message. Called by the subclass that implements message processing.
      * @param JsonRpcMessage $message The incoming message.
      */
-    protected function handleIncomingMessage(JsonRpcMessage $message): void {
+    protected function handleIncomingMessage(JsonRpcMessage $message): void
+    {
         $this->validateMessage($message);
 
         $innerMessage = $message->message;
@@ -300,14 +313,16 @@ abstract class BaseSession {
         }
     }
 
-    private function validateMessage(JsonRpcMessage $message): void {
+    private function validateMessage(JsonRpcMessage $message): void
+    {
         $innerMessage = $message->message;
         if ($innerMessage->jsonrpc !== '2.0') {
             throw new InvalidArgumentException('Invalid JSON-RPC version');
         }
     }
 
-    private function validateRequestObject(McpModel $request): void {
+    private function validateRequestObject(McpModel $request): void
+    {
         // Check if request has a method property
         if (!property_exists($request, 'method') || empty($request->method)) {
             throw new InvalidArgumentException('Request must have a method');
@@ -318,15 +333,16 @@ abstract class BaseSession {
      * Converts an incoming JSONRPCRequest into a typed request object.
      * @throws InvalidArgumentException If instantiation fails.
      */
-    private function validateIncomingRequest(JSONRPCRequest $message): McpModel {
+    private function validateIncomingRequest(JSONRPCRequest $message): McpModel
+    {
         $requestClass = $this->receiveRequestType;
-        
+
         $params = $message->params ?? [];
         if (is_object($params)) {
             // Convert object to array
-            $params = $params->jsonSerialize(); 
+            $params = $params->jsonSerialize();
         }
-        
+
         $request = $requestClass::fromMethodAndParams($message->method, $params);
         return $request;
     }
@@ -335,15 +351,16 @@ abstract class BaseSession {
      * Converts an incoming JSONRPCNotification into a typed notification object.
      * @throws InvalidArgumentException If instantiation fails.
      */
-    private function validateIncomingNotification(JSONRPCNotification $message): McpModel {
+    private function validateIncomingNotification(JSONRPCNotification $message): McpModel
+    {
         $notificationClass = $this->receiveNotificationType;
-        
+
         $params = $message->params ?? [];
         if (is_object($params)) {
             // Convert object to array
             $params = $params->jsonSerialize();
         }
-    
+
         $notification = $notificationClass::fromMethodAndParams($message->method, $params);
         return $notification;
     }
@@ -360,7 +377,8 @@ abstract class BaseSession {
      * @throws McpError If an error response is received.
      * @throws InvalidArgumentException If no result is received.
      */
-    protected function waitForResponse(int $requestIdValue, string $resultType, ?McpModel &$futureResult): McpModel {
+    protected function waitForResponse(int $requestIdValue, string $resultType, ?McpModel &$futureResult): ?McpModel
+    {
         // The handler we set above will set $futureResult when the response arrives.
         // So we run a loop reading messages until $futureResult is not null or an error is thrown.
 

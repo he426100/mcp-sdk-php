@@ -75,6 +75,6 @@ abstract class Capabilities implements McpModel {
         if ($this->experimental !== null) {
             $data['experimental'] = $this->experimental;
         }
-        return array_merge($data, $this->extraFields);
+        return array_filter(array_merge($data, $this->extraFields));
     }
 }

@@ -41,6 +41,7 @@ use Mcp\Types\JSONRPCError;
 use Mcp\Types\RequestParams;
 use Mcp\Types\NotificationParams;
 use Mcp\Types\Result;
+use Mcp\Types\Meta;
 use RuntimeException;
 use InvalidArgumentException;
 
@@ -50,7 +51,8 @@ use InvalidArgumentException;
  * STDIO-based transport implementation for MCP servers.
  * Handles reading from STDIN and writing to STDOUT using JSON-RPC 2.0 protocol.
  */
-class StdioServerTransport implements Transport {
+class StdioServerTransport implements Transport
+{
     /** @var resource */
     private $stdin;
     /** @var resource */
@@ -88,7 +90,8 @@ class StdioServerTransport implements Transport {
      *
      * @throws RuntimeException If the transport is already started or if setting non-blocking mode fails.
      */
-    public function start(): void {
+    public function start(): void
+    {
         if ($this->isStarted) {
             throw new RuntimeException('Transport already started');
         }
@@ -112,7 +115,8 @@ class StdioServerTransport implements Transport {
     /**
      * Stops the transport and flushes any remaining messages in the buffer.
      */
-    public function stop(): void {
+    public function stop(): void
+    {
         if (!$this->isStarted) {
             return;
         }
@@ -126,7 +130,8 @@ class StdioServerTransport implements Transport {
      *
      * @return bool True if data is available, false otherwise.
      */
-    public function hasDataAvailable(): bool {
+    public function hasDataAvailable(): bool
+    {
         $read = [$this->stdin];
         $write = $except = [];
         // Timeout of 0 for non-blocking check
@@ -141,7 +146,8 @@ class StdioServerTransport implements Transport {
      * @throws RuntimeException If the transport is not started.
      * @throws McpError          If a JSON-RPC error occurs during parsing or validation.
      */
-    public function readMessage(): ?JsonRpcMessage {
+    public function readMessage(): ?JsonRpcMessage
+    {
         if (!$this->isStarted) {
             throw new RuntimeException('Transport not started');
         }
@@ -217,7 +223,7 @@ class StdioServerTransport implements Transport {
             } elseif ($hasMethod && $hasId && !$hasResult) {
                 // It's a JSONRPCRequest
                 $method = $data['method'];
-                $params = isset($data['params']) && is_array($data['params']) ? $this->parseRequestParams($data['params']) : null;
+                $params = isset($data['params']) && is_array($data['params']) ? RequestParams::fromArray($data['params']) : null;
 
                 $req = new JSONRPCRequest(
                     jsonrpc: '2.0',
@@ -231,7 +237,7 @@ class StdioServerTransport implements Transport {
             } elseif ($hasMethod && !$hasId && !$hasResult && !$hasError) {
                 // It's a JSONRPCNotification
                 $method = $data['method'];
-                $params = isset($data['params']) && is_array($data['params']) ? $this->parseNotificationParams($data['params']) : null;
+                $params = isset($data['params']) && is_array($data['params']) ? NotificationParams::fromArray($data['params']) : null;
 
                 $not = new JSONRPCNotification(
                     jsonrpc: '2.0',
@@ -291,7 +297,8 @@ class StdioServerTransport implements Transport {
      *
      * @throws RuntimeException If the transport is not started or if writing fails.
      */
-    public function writeMessage(JsonRpcMessage $message): void {
+    public function writeMessage(JsonRpcMessage $message): void
+    {
         if (!$this->isStarted) {
             throw new RuntimeException('Transport not started');
         }
@@ -317,7 +324,8 @@ class StdioServerTransport implements Transport {
      *
      * @throws RuntimeException If writing to STDOUT fails.
      */
-    public function flush(): void {
+    public function flush(): void
+    {
         if (!$this->isStarted) {
             return;
         }
@@ -349,68 +357,8 @@ class StdioServerTransport implements Transport {
      *
      * @return self
      */
-    public static function create($stdin = null, $stdout = null): self {
+    public static function create($stdin = null, $stdout = null): self
+    {
         return new self($stdin, $stdout);
-    }
-
-    /**
-     * Parses request parameters from an associative array.
-     *
-     * @param array $params The parameters array from the JSON-RPC request.
-     *
-     * @return RequestParams The parsed RequestParams object.
-     */
-    private function parseRequestParams(array $params): RequestParams {
-        $meta = isset($params['_meta']) ? $this->metaFromArray($params['_meta']) : null;
-
-        // Correctly passing $meta as the first argument
-        $requestParams = new RequestParams($meta);
-
-        // Assign other parameters dynamically
-        foreach ($params as $key => $value) {
-            if ($key !== '_meta') {
-                $requestParams->$key = $value;
-            }
-        }
-
-        return $requestParams;
-    }
-
-    /**
-     * Parses notification parameters from an associative array.
-     *
-     * @param array $params The parameters array from the JSON-RPC notification.
-     *
-     * @return NotificationParams The parsed NotificationParams object.
-     */
-    private function parseNotificationParams(array $params): NotificationParams {
-        $meta = isset($params['_meta']) ? $this->metaFromArray($params['_meta']) : null;
-
-        // Correctly passing $meta as the first argument
-        $notificationParams = new NotificationParams($meta);
-
-        // Assign other parameters dynamically
-        foreach ($params as $key => $value) {
-            if ($key !== '_meta') {
-                $notificationParams->$key = $value;
-            }
-        }
-
-        return $notificationParams;
-    }
-
-    /**
-     * Helper method to create a Meta object from an associative array.
-     *
-     * @param array $metaArr The meta information array.
-     *
-     * @return \Mcp\Types\Meta The constructed Meta object.
-     */
-    private function metaFromArray(array $metaArr): \Mcp\Types\Meta {
-        $meta = new \Mcp\Types\Meta();
-        foreach ($metaArr as $key => $value) {
-            $meta->$key = $value;
-        }
-        return $meta;
     }
 }

@@ -32,7 +32,8 @@ namespace Mcp\Types;
 /**
  * Describes the name and version of an MCP implementation
  */
-class Implementation implements McpModel {
+class Implementation implements McpModel
+{
     use ExtraFieldsTrait;
 
     public function __construct(
@@ -40,7 +41,8 @@ class Implementation implements McpModel {
         public readonly string $version,
     ) {}
 
-    public static function fromArray(array $data): self {
+    public static function fromArray(array $data): self
+    {
         // Extract required fields
         $name = $data['name'] ?? '';
         $version = $data['version'] ?? '';
@@ -62,7 +64,8 @@ class Implementation implements McpModel {
         return $obj;
     }
 
-    public function validate(): void {
+    public function validate(): void
+    {
         if (empty($this->name)) {
             throw new \InvalidArgumentException('Implementation name cannot be empty');
         }
@@ -71,8 +74,12 @@ class Implementation implements McpModel {
         }
     }
 
-    public function jsonSerialize(): mixed {
+    public function jsonSerialize(): mixed
+    {
         $data = get_object_vars($this);
+        if (empty($data['extraFields'])) {
+            unset($data['extraFields']);
+        }
         return array_merge($data, $this->extraFields);
     }
 }

@@ -44,7 +44,8 @@ use RuntimeException;
  * This class emulates the behavior seen in the Python code, which uses async streams.
  * Here, we run a loop reading messages from STDIO, passing them to the Server for handling.
  */
-class ServerRunner {
+class ServerRunner
+{
     private LoggerInterface $logger;
 
     public function __construct(
@@ -60,7 +61,8 @@ class ServerRunner {
      *
      * This sets up a ServerSession with a StdioServerTransport and enters a loop to read messages.
      */
-    public function run(): void {
+    public function run(): void
+    {
         // Suppress warnings unless explicitly enabled (similar to Python code ignoring warnings)
         if (!getenv('MCP_ENABLE_WARNINGS')) {
             error_reporting(E_ERROR | E_PARSE);
@@ -85,7 +87,6 @@ class ServerRunner {
             $session->start();
 
             $this->logger->info('Server started');
-
         } catch (\Exception $e) {
             $this->logger->error('Server error: ' . $e->getMessage());
             throw $e;
@@ -102,41 +103,51 @@ class ServerRunner {
     /**
      * Creates a default PSR logger if none provided
      */
-    private function createDefaultLogger(): LoggerInterface {
+    private function createDefaultLogger(): LoggerInterface
+    {
         return new class implements LoggerInterface {
-            public function emergency($message, array $context = []): void {
+            public function emergency($message, array $context = []): void
+            {
                 $this->log(LogLevel::EMERGENCY, $message, $context);
             }
 
-            public function alert($message, array $context = []): void {
+            public function alert($message, array $context = []): void
+            {
                 $this->log(LogLevel::ALERT, $message, $context);
             }
 
-            public function critical($message, array $context = []): void {
+            public function critical($message, array $context = []): void
+            {
                 $this->log(LogLevel::CRITICAL, $message, $context);
             }
 
-            public function error($message, array $context = []): void {
+            public function error($message, array $context = []): void
+            {
                 $this->log(LogLevel::ERROR, $message, $context);
             }
 
-            public function warning($message, array $context = []): void {
+            public function warning($message, array $context = []): void
+            {
                 $this->log(LogLevel::WARNING, $message, $context);
             }
 
-            public function notice($message, array $context = []): void {
+            public function notice($message, array $context = []): void
+            {
                 $this->log(LogLevel::NOTICE, $message, $context);
             }
 
-            public function info($message, array $context = []): void {
+            public function info($message, array $context = []): void
+            {
                 $this->log(LogLevel::INFO, $message, $context);
             }
 
-            public function debug($message, array $context = []): void {
+            public function debug($message, array $context = []): void
+            {
                 $this->log(LogLevel::DEBUG, $message, $context);
             }
 
-            public function log($level, $message, array $context = []): void {
+            public function log($level, $message, array $context = []): void
+            {
                 $timestamp = date('Y-m-d H:i:s');
                 fprintf(
                     STDERR,
@@ -147,7 +158,8 @@ class ServerRunner {
                 );
             }
 
-            private function interpolate($message, array $context = []): string {
+            private function interpolate($message, array $context = []): string
+            {
                 $replace = [];
                 foreach ($context as $key => $val) {
                     $replace['{' . $key . '}'] = $val;
