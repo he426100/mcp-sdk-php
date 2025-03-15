@@ -1,0 +1,4 @@
+parameters:
+  reportUnmatchedIgnoredErrors: false
+  excludePaths:
+    - webclient/
