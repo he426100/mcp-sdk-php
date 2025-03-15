@@ -32,17 +32,20 @@ namespace Mcp\Types;
 /**
  * Request to call a tool
  */
-class CallToolRequest extends Request {
+class CallToolRequest extends Request
+{
     /**
      * @param string $name The name of the tool to call
      * @param array<string, mixed>|null $arguments Optional arguments for the tool call
      */
-    public function __construct(string $name, ?array $arguments = null) {
+    public function __construct(string $name, ?array $arguments = null)
+    {
         $params = new CallToolRequestParams($name, $arguments);
         parent::__construct('tools/call', $params);
     }
 
-    public function validate(): void {
+    public function validate(): void
+    {
         parent::validate();
         if ($this->params instanceof CallToolRequestParams) {
             $this->params->validate();
