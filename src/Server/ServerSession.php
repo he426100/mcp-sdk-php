@@ -179,8 +179,7 @@ class ServerSession extends BaseSession
      * Handle incoming requests. If it's the initialize request, handle it specially.
      * Otherwise, ensure initialization is complete before handling other requests.
      *
-     * @param ClientRequest $request The incoming client request.
-     * @param callable $respond The responder callable.
+     * @param RequestResponder $responder
      */
     public function handleRequest(RequestResponder $responder): void
     {

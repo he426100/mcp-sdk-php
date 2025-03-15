@@ -77,9 +77,6 @@ class ServerRunner
                 $this->logger
             );
 
-            // Connect the server with the session
-            $this->server->setSession($session);
-
             // Add handlers
             $session->registerHandlers($this->server->getHandlers());
             $session->registerNotificationHandlers($this->server->getNotificationHandlers());

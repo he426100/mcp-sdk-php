@@ -62,7 +62,6 @@ class Server
     private array $requestHandlers = [];
     /** @var array<string, callable(?array): void> */
     private array $notificationHandlers = [];
-    private ?ServerSession $session = null;
     private LoggerInterface $logger;
 
     public function __construct(
@@ -139,7 +138,7 @@ class Server
             resources: $resourcesCapability,
             tools: $toolsCapability,
             logging: $loggingCapability,
-            experimental: new ExperimentalCapabilities($experimentalCapabilities) // Assuming a constructor
+            experimental: ExperimentalCapabilities::fromArray($experimentalCapabilities) // Assuming a constructor
         );
     }
 
@@ -185,15 +184,5 @@ class Server
     {
         // Return a static version. Actual implementation can read from composer.json or elsewhere.
         return '1.0.0';
-    }
-
-    /**
-     * Sets the active server session.
-     *
-     * @param ServerSession $session The server session to set.
-     */
-    public function setSession(ServerSession $session): void
-    {
-        $this->session = $session;
     }
 }
