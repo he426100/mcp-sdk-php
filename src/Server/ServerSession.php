@@ -148,10 +148,12 @@ class ServerSession extends BaseSession
             if ($clientCaps->experimental === null) {
                 return false;
             }
-            foreach ($capability->experimental as $key => $value) {
+            
+            $expProps = get_object_vars($capability->experimental);
+            foreach ($expProps as $key => $value) {
                 if (
-                    !isset($clientCaps->experimental[$key]) ||
-                    $clientCaps->experimental[$key] !== $value
+                    !property_exists($clientCaps->experimental, $key) ||
+                    $clientCaps->experimental->$key !== $value
                 ) {
                     return false;
                 }
@@ -374,10 +376,12 @@ class ServerSession extends BaseSession
      */
     private function writeNotification(string $method, ?array $params = null): void
     {
+        $notificationParams = $params !== null ? NotificationParams::fromArray($params) : null;
+        
         $jsonRpcNotification = new JSONRPCNotification(
             jsonrpc: '2.0',
             method: $method,
-            params: $params
+            params: $notificationParams
         );
 
         $notification = new JsonRpcMessage($jsonRpcNotification);
