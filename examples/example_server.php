@@ -6,11 +6,11 @@
 ini_set('display_errors', 0);
 ini_set('display_startup_errors', 0);
 ini_set('log_errors', 1);
-ini_set('error_log', __DIR__ . '/php_errors.log'); // Logs errors to a file
+ini_set('error_log', __DIR__ . '/runtime/php_errors.log'); // Logs errors to a file
 ini_set('memory_limit', '2G');
 error_reporting(E_ALL);
 
-! defined('BASE_PATH') && define('BASE_PATH', __DIR__);
+! defined('BASE_PATH') && define('BASE_PATH', dirname(__DIR__, 1));
 require BASE_PATH . '/vendor/autoload.php';
 
 use Mcp\Server\Server;
@@ -34,10 +34,10 @@ use Monolog\Formatter\LineFormatter;
 $logger = new Logger('mcp-server');
 
 // Delete previous log
-@unlink(__DIR__ . '/server_log.txt');
+@unlink(__DIR__ . '/runtime/server_log.txt');
 
 // Create a handler that writes to server_log.txt
-$handler = new StreamHandler(__DIR__ . '/server_log.txt', Level::Debug);
+$handler = new StreamHandler(__DIR__ . '/runtime/server_log.txt', Level::Debug);
 
 // Optional: Create a custom formatter to make logs more readable
 $dateFormat = "Y-m-d H:i:s";
