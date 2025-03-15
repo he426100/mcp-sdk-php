@@ -75,4 +75,3 @@ class CompleteResult extends Result {
         $this->completion->validate();
     }
 }
-}
