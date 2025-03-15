@@ -31,7 +31,8 @@ namespace Mcp\Server\Transport;
 /**
  * Interface for transports that support non-blocking operations
  */
-interface NonBlockingTransport extends Transport {
+interface NonBlockingTransport extends Transport
+{
     /**
      * Check if the transport has data available to read
      *

@@ -31,7 +31,8 @@ namespace Mcp\Server\Transport;
 /**
  * Interface for transports that need to buffer output
  */
-interface BufferedTransport extends Transport {
+interface BufferedTransport extends Transport
+{
     /**
      * Flush any buffered output
      */

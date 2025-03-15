@@ -33,7 +33,8 @@ use Mcp\Types\JsonRpcMessage;
 /**
  * Base interface for MCP transport implementations
  */
-interface Transport {
+interface Transport
+{
     /**
      * Start the transport
      *

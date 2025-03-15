@@ -37,7 +37,8 @@ use Mcp\Types\ProgressToken;
  * Similar to the Python ProgressContext class, but synchronous.
  * Tracks current progress and sends progress notifications via the session.
  */
-class ProgressContext {
+class ProgressContext
+{
     private float $current = 0.0;
 
     public function __construct(
@@ -49,7 +50,8 @@ class ProgressContext {
     /**
      * Increments the current progress by the given amount and sends a progress notification.
      */
-    public function progress(float $amount): void {
+    public function progress(float $amount): void
+    {
         $this->current += $amount;
         $this->session->sendProgressNotification(
             $this->progressToken,
@@ -58,11 +60,13 @@ class ProgressContext {
         );
     }
 
-    public function getCurrent(): float {
+    public function getCurrent(): float
+    {
         return $this->current;
     }
 
-    public function getTotal(): ?float {
+    public function getTotal(): ?float
+    {
         return $this->total;
     }
 }

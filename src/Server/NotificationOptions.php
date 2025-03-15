@@ -33,7 +33,8 @@ use RuntimeException;
 /**
  * Options for server notifications
  */
-class NotificationOptions {
+class NotificationOptions
+{
     public function __construct(
         public readonly bool $promptsChanged = false,
         public readonly bool $resourcesChanged = false,

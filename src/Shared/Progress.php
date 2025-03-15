@@ -38,7 +38,8 @@ use InvalidArgumentException;
  *
  * Equivalent to the Python Progress(BaseModel) class.
  */
-class Progress implements McpModel {
+class Progress implements McpModel
+{
     use ExtraFieldsTrait;
 
     public function __construct(
@@ -46,13 +47,15 @@ class Progress implements McpModel {
         public readonly ?float $total = null,
     ) {}
 
-    public function validate(): void {
+    public function validate(): void
+    {
         if ($this->total !== null && $this->total < $this->progress) {
             throw new InvalidArgumentException('Total cannot be less than progress');
         }
     }
 
-    public function jsonSerialize(): mixed {
+    public function jsonSerialize(): mixed
+    {
         $data = [
             'progress' => $this->progress,
         ];

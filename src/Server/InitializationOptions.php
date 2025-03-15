@@ -36,7 +36,8 @@ use InvalidArgumentException;
 /**
  * Options used to initialize an MCP server
  */
-class InitializationOptions implements McpModel {
+class InitializationOptions implements McpModel
+{
     use ExtraFieldsTrait;
 
     public function __construct(
@@ -45,7 +46,8 @@ class InitializationOptions implements McpModel {
         public readonly ServerCapabilities $capabilities
     ) {}
 
-    public function validate(): void {
+    public function validate(): void
+    {
         if (empty($this->serverName)) {
             throw new \InvalidArgumentException('Server name cannot be empty');
         }
@@ -55,7 +57,8 @@ class InitializationOptions implements McpModel {
         $this->capabilities->validate();
     }
 
-    public function jsonSerialize(): mixed {
+    public function jsonSerialize(): mixed
+    {
         $data = [
             'server_name' => $this->serverName,
             'server_version' => $this->serverVersion,

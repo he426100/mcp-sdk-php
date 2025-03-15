@@ -36,7 +36,8 @@ namespace Mcp\Shared;
  * LATEST_PROTOCOL_VERSION = "2024-11-05"
  * SUPPORTED_PROTOCOL_VERSIONS = [1, LATEST_PROTOCOL_VERSION]
  */
-class Version {
+class Version
+{
     public const LATEST_PROTOCOL_VERSION = '2024-11-05';
     public const SUPPORTED_PROTOCOL_VERSIONS = ['1', self::LATEST_PROTOCOL_VERSION];
 }

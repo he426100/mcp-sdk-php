@@ -40,7 +40,8 @@ use Mcp\Server\Server;
  * pairs of MemoryStream objects that can be used to simulate client-server
  * communication in memory.
  */
-class MemoryTransport {
+class MemoryTransport
+{
     /**
      * Creates a pair of bidirectional memory streams for client-server communication.
      *
@@ -59,7 +60,8 @@ class MemoryTransport {
      * @return array{array{MemoryStream, MemoryStream}, array{MemoryStream, MemoryStream}}
      *   A tuple: [clientStreams, serverStreams]
      */
-    public static function createClientServerStreams(): array {
+    public static function createClientServerStreams(): array
+    {
         $serverToClient = new MemoryStream();
         $clientToServer = new MemoryStream();
 

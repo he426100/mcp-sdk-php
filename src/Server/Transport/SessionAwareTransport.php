@@ -33,7 +33,8 @@ use Mcp\Shared\BaseSession;
 /**
  * Interface for transports that manage server sessions
  */
-interface SessionAwareTransport extends Transport {
+interface SessionAwareTransport extends Transport
+{
     /**
      * Attach a session to the transport
      *

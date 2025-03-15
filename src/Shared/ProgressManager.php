@@ -36,12 +36,14 @@ use InvalidArgumentException;
  *
  * Similar to the Python code's context manager `progress()`, but here we just return a ProgressContext instance.
  */
-class ProgressManager {
+class ProgressManager
+{
     /**
      * Creates a ProgressContext from a RequestContext.
      * Throws an exception if no progress token is provided.
      */
-    public static function createContext(RequestContext $ctx, ?float $total = null): ProgressContext {
+    public static function createContext(RequestContext $ctx, ?float $total = null): ProgressContext
+    {
         $meta = $ctx->getMeta();
         if ($meta === null || $meta->getProgressToken() === null) {
             throw new InvalidArgumentException('No progress token provided');

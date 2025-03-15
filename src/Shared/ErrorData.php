@@ -45,7 +45,8 @@ use InvalidArgumentException;
  * 
  * We use ExtraFieldsTrait to allow arbitrary additional fields if needed.
  */
-class ErrorData implements McpModel {
+class ErrorData implements McpModel
+{
     use ExtraFieldsTrait;
 
     public function __construct(
@@ -54,13 +55,15 @@ class ErrorData implements McpModel {
         public readonly mixed $data = null,
     ) {}
 
-    public function validate(): void {
+    public function validate(): void
+    {
         if (empty($this->message)) {
             throw new InvalidArgumentException('Error message cannot be empty');
         }
     }
 
-    public function jsonSerialize(): mixed {
+    public function jsonSerialize(): mixed
+    {
         $data = [
             'code' => $this->code,
             'message' => $this->message,

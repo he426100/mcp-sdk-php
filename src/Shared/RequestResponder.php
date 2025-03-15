@@ -41,7 +41,8 @@ use RuntimeException;
  * Similar to the Python RequestResponder, which stores request_id, request_meta, request, and session.
  * Here, we assume `$request` is a typed request (McpModel) and `$params` are its parameters.
  */
-class RequestResponder {
+class RequestResponder
+{
     private bool $responded = false;
     private ?Meta $requestMeta = null;
 
@@ -65,7 +66,8 @@ class RequestResponder {
      *
      * @param McpModel|ErrorData $response
      */
-    public function respond(mixed $response): void {
+    public function respond(mixed $response): void
+    {
         if ($this->responded) {
             throw new RuntimeException('Request already responded to');
         }
@@ -74,25 +76,29 @@ class RequestResponder {
         $this->session->sendResponse($this->requestId, $response);
     }
 
-    public function sendResponse(mixed $response): void {
+    public function sendResponse(mixed $response): void
+    {
         $this->respond($response);
     }
 
-    public function getRequest(): McpModel {
+    public function getRequest(): McpModel
+    {
         return $this->request;
     }
 
     /**
      * Returns the Meta object associated with the request, if any.
      */
-    public function getMeta(): ?Meta {
+    public function getMeta(): ?Meta
+    {
         return $this->requestMeta;
     }
 
     /**
      * Extracts '_meta' from params if present and creates a Meta object.
      */
-    private function extractMeta(): void {
+    private function extractMeta(): void
+    {
         if (isset($this->params['_meta']) && is_array($this->params['_meta'])) {
             $this->requestMeta = new Meta();
             foreach ($this->params['_meta'] as $key => $value) {

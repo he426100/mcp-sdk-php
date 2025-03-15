@@ -39,7 +39,8 @@ use Exception;
  * JsonRpcMessage objects and Exception objects. The receive method returns
  * the oldest inserted item first, acting as a FIFO queue.
  */
-class MemoryStream {
+class MemoryStream
+{
     /** @var array<JsonRpcMessage|Exception> */
     private array $queue = [];
 
@@ -48,7 +49,8 @@ class MemoryStream {
      *
      * @param mixed $item
      */
-    public function send(mixed $item): void {
+    public function send(mixed $item): void
+    {
         $this->queue[] = $item;
     }
 
@@ -57,14 +59,16 @@ class MemoryStream {
      *
      * @return mixed Returns the next item or null if empty.
      */
-    public function receive(): mixed {
+    public function receive(): mixed
+    {
         return array_shift($this->queue) ?? null;
     }
 
     /**
      * Checks if the stream is empty.
      */
-    public function isEmpty(): bool {
+    public function isEmpty(): bool
+    {
         return empty($this->queue);
     }
 }

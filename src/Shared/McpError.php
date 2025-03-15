@@ -36,7 +36,8 @@ use Exception;
  *
  * Wraps the ErrorData object in an exception for easy error handling.
  */
-class McpError extends Exception {
+class McpError extends Exception
+{
     public function __construct(
         public readonly ErrorData $error,
         ?\Throwable $previous = null

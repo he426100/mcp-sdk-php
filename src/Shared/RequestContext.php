@@ -38,7 +38,8 @@ use Mcp\Types\Meta;
  * Similar to the Python RequestContext, which holds request_id, meta, and session.
  * Here, `meta` corresponds to params['_meta'] if present.
  */
-class RequestContext {
+class RequestContext
+{
     private ?Meta $meta = null;
 
     /**
@@ -54,29 +55,34 @@ class RequestContext {
         $this->extractMeta();
     }
 
-    public function getRequestId(): RequestId {
+    public function getRequestId(): RequestId
+    {
         return $this->requestId;
     }
 
-    public function getParams(): array {
+    public function getParams(): array
+    {
         return $this->params;
     }
 
-    public function getSession(): BaseSession {
+    public function getSession(): BaseSession
+    {
         return $this->session;
     }
 
     /**
      * Returns the Meta object if available, otherwise null.
      */
-    public function getMeta(): ?Meta {
+    public function getMeta(): ?Meta
+    {
         return $this->meta;
     }
 
     /**
      * Extracts '_meta' from params if present and creates a Meta object.
      */
-    private function extractMeta(): void {
+    private function extractMeta(): void
+    {
         if (isset($this->params['_meta']) && is_array($this->params['_meta'])) {
             $this->meta = new Meta();
             // Populate Meta fields from _meta array
