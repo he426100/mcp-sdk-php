@@ -79,6 +79,6 @@ class ListToolsResult extends PaginatedResult {
     public function jsonSerialize(): mixed {
         $data = parent::jsonSerialize();
         $data['tools'] = $this->tools;
-        return $data;
+        return array_filter($data);
     }
 }
