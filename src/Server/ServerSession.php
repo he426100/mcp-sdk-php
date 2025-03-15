@@ -412,6 +412,7 @@ class ServerSession extends BaseSession
 
     protected function writeMessage(JsonRpcMessage $message): void
     {
+        $this->logger->debug('writeMessage: ' . json_encode($message));
         $this->transport->writeMessage($message);
     }
 
@@ -426,6 +427,7 @@ class ServerSession extends BaseSession
         while (true) {
             $message = $this->transport->readMessage();
             if ($message !== null) {
+                $this->logger->debug('readNextMessage: ' . json_encode($message));
                 return $message;
             }
             // Sleep briefly to avoid busy-waiting when no messages are available
