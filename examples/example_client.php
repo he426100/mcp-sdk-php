@@ -26,10 +26,10 @@ use Monolog\Formatter\LineFormatter;
 $logger = new Logger('mcp-client');
 
 // Delete previous log
-@unlink(__DIR__ . '/runtime/client_log.txt');
+@unlink(BASE_PATH . '/runtime/client_log.txt');
 
 // Create a handler that writes to client_log.txt
-$handler = new StreamHandler(__DIR__ . '/runtime/client_log.txt', Level::Debug);
+$handler = new StreamHandler(BASE_PATH . '/runtime/client_log.txt', Level::Debug);
 
 // Optional: Create a custom formatter to make logs more readable
 $dateFormat = "Y-m-d H:i:s";
