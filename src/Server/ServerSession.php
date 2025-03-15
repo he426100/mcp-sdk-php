@@ -406,7 +406,6 @@ class ServerSession extends BaseSession
 
     protected function stopMessageProcessing(): void
     {
-        $this->stop();
     }
 
     protected function writeMessage(JsonRpcMessage $message): void
