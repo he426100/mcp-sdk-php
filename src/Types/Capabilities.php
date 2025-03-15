@@ -37,14 +37,16 @@ namespace Mcp\Types;
  *   ...and more fields in subclasses
  * }
  */
-abstract class Capabilities implements McpModel {
+abstract class Capabilities implements McpModel
+{
     use ExtraFieldsTrait;
 
     public function __construct(
         public ?ExperimentalCapabilities $experimental = null,
     ) {}
 
-    public static function fromArray(array $data): self {
+    public static function fromArray(array $data): self
+    {
         $experimentalData = $data['experimental'] ?? null;
         unset($data['experimental']);
 
@@ -64,17 +66,19 @@ abstract class Capabilities implements McpModel {
         return $obj;
     }
 
-    public function validate(): void {
+    public function validate(): void
+    {
         if ($this->experimental !== null) {
             $this->experimental->validate();
         }
     }
 
-    public function jsonSerialize(): mixed {
+    public function jsonSerialize(): mixed
+    {
         $data = [];
         if ($this->experimental !== null) {
             $data['experimental'] = $this->experimental;
         }
-        return array_filter(array_merge($data, $this->extraFields));
+        return array_merge($data, $this->extraFields);
     }
 }

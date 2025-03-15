@@ -40,9 +40,6 @@ use Mcp\Types\JSONRPCResponse;
 use Mcp\Types\JSONRPCError;
 use Mcp\Types\McpModel;
 use Mcp\Shared\McpError;
-use Mcp\Types\JsonRpcErrorObject;
-use Mcp\Types\NotificationParams;
-use Mcp\Types\ProgressNotificationParams;
 use InvalidArgumentException;
 use RuntimeException;
 
@@ -58,11 +55,11 @@ abstract class BaseSession
 {
     protected bool $isInitialized = false;
     /** @var array<int, callable(JsonRpcMessage):void> */
-    protected array $responseHandlers = [];
+    private array $responseHandlers = [];
     /** @var callable[] */
-    protected array $requestHandlers = [];
+    private array $requestHandlers = [];
     /** @var callable[] */
-    protected array $notificationHandlers = [];
+    private array $notificationHandlers = [];
     private int $requestId = 0;
 
     /**
@@ -221,20 +218,20 @@ abstract class BaseSession
         float $progress,
         ?float $total = null
     ): void {
-        $progressNotification = new ProgressNotification(new ProgressNotificationParams(
+        $progressNotification = new ProgressNotification(
             progressToken: $progressToken,
             progress: $progress,
             total: $total
-        ));
+        );
 
         $jsonRpcNotification = new JSONRPCNotification(
             jsonrpc: '2.0',
             method: $progressNotification->method,
-            params: NotificationParams::fromArray([
+            params: [
                 'progressToken' => $progressToken,
                 'progress' => $progress,
                 'total' => $total
-            ])
+            ]
         );
 
         $jsonRpcMessage = new JsonRpcMessage($jsonRpcNotification);
@@ -377,7 +374,7 @@ abstract class BaseSession
      * @throws McpError If an error response is received.
      * @throws InvalidArgumentException If no result is received.
      */
-    protected function waitForResponse(int $requestIdValue, string $resultType, ?McpModel &$futureResult): ?McpModel
+    protected function waitForResponse(int $requestIdValue, string $resultType, ?McpModel &$futureResult): McpModel
     {
         // The handler we set above will set $futureResult when the response arrives.
         // So we run a loop reading messages until $futureResult is not null or an error is thrown.

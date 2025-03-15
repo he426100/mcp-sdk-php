@@ -46,7 +46,6 @@ use Mcp\Server\Transport\Transport;
 use Mcp\Types\JSONRPCResponse;
 use Mcp\Types\JSONRPCError;
 use Mcp\Types\JSONRPCNotification;
-use Mcp\Types\NotificationParams;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use RuntimeException;
@@ -148,12 +147,10 @@ class ServerSession extends BaseSession
             if ($clientCaps->experimental === null) {
                 return false;
             }
-            
-            $expProps = get_object_vars($capability->experimental);
-            foreach ($expProps as $key => $value) {
+            foreach ($capability->experimental as $key => $value) {
                 if (
-                    !property_exists($clientCaps->experimental, $key) ||
-                    $clientCaps->experimental->$key !== $value
+                    !isset($clientCaps->experimental[$key]) ||
+                    $clientCaps->experimental[$key] !== $value
                 ) {
                     return false;
                 }
@@ -181,11 +178,11 @@ class ServerSession extends BaseSession
      * Handle incoming requests. If it's the initialize request, handle it specially.
      * Otherwise, ensure initialization is complete before handling other requests.
      *
-     * @param RequestResponder $responder
+     * @param ClientRequest $request The incoming client request.
+     * @param callable $respond The responder callable.
      */
     public function handleRequest(RequestResponder $responder): void
     {
-        /** @var ClientRequest */
         $request = $responder->getRequest(); // a ClientRequest
         $actualRequest = $request->getRequest(); // the underlying typed Request
         $method = $actualRequest->method;
@@ -284,14 +281,16 @@ class ServerSession extends BaseSession
         mixed $data,
         ?string $logger = null
     ): void {
+        $params = [
+            'level' => $level->value,
+            'data' => $data,
+            'logger' => $logger
+        ];
+
         $jsonRpcNotification = new JSONRPCNotification(
             jsonrpc: '2.0',
             method: 'notifications/message',
-            params: NotificationParams::fromArray([
-                'level' => $level->value,
-                'data' => $data,
-                'logger' => $logger
-            ])
+            params: $params
         );
 
         $notification = new JsonRpcMessage($jsonRpcNotification);
@@ -306,10 +305,12 @@ class ServerSession extends BaseSession
      */
     public function sendResourceUpdated(string $uri): void
     {
+        $params = ['uri' => $uri];
+
         $jsonRpcNotification = new JSONRPCNotification(
             jsonrpc: '2.0',
             method: 'notifications/resources/updated',
-            params: NotificationParams::fromArray(['uri' => $uri])
+            params: $params
         );
 
         $notification = new JsonRpcMessage($jsonRpcNotification);
@@ -329,14 +330,16 @@ class ServerSession extends BaseSession
         float $progress,
         ?float $total = null
     ): void {
+        $params = [
+            'progressToken' => $progressToken,
+            'progress' => $progress,
+            'total' => $total
+        ];
+
         $jsonRpcNotification = new JSONRPCNotification(
             jsonrpc: '2.0',
             method: 'notifications/progress',
-            params: NotificationParams::fromArray([
-                'progressToken' => $progressToken,
-                'progress' => $progress,
-                'total' => $total
-            ])
+            params: $params
         );
 
         $notification = new JsonRpcMessage($jsonRpcNotification);
@@ -376,12 +379,10 @@ class ServerSession extends BaseSession
      */
     private function writeNotification(string $method, ?array $params = null): void
     {
-        $notificationParams = $params !== null ? NotificationParams::fromArray($params) : null;
-        
         $jsonRpcNotification = new JSONRPCNotification(
             jsonrpc: '2.0',
             method: $method,
-            params: $notificationParams
+            params: $params
         );
 
         $notification = new JsonRpcMessage($jsonRpcNotification);
@@ -411,7 +412,6 @@ class ServerSession extends BaseSession
 
     protected function writeMessage(JsonRpcMessage $message): void
     {
-        $this->logger->debug('writeMessage: ' . json_encode($message));
         $this->transport->writeMessage($message);
     }
 
@@ -426,7 +426,6 @@ class ServerSession extends BaseSession
         while (true) {
             $message = $this->transport->readMessage();
             if ($message !== null) {
-                $this->logger->debug('readNextMessage: ' . json_encode($message));
                 return $message;
             }
             // Sleep briefly to avoid busy-waiting when no messages are available

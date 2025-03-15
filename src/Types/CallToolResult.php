@@ -100,10 +100,4 @@ class CallToolResult extends Result
             $item->validate();
         }
     }
-
-    public function jsonSerialize(): mixed
-    {
-        $data = parent::jsonSerialize();
-        return array_filter($data);
-    }
 }

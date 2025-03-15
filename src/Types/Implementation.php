@@ -77,9 +77,6 @@ class Implementation implements McpModel
     public function jsonSerialize(): mixed
     {
         $data = get_object_vars($this);
-        if (empty($data['extraFields'])) {
-            unset($data['extraFields']);
-        }
         return array_merge($data, $this->extraFields);
     }
 }

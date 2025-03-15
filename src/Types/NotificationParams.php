@@ -32,38 +32,23 @@ namespace Mcp\Types;
  * Represents the `params` object in a Notification.
  * Similar to RequestParams, it can have `_meta?: object` and arbitrary fields.
  */
-class NotificationParams implements McpModel {
+class NotificationParams implements McpModel
+{
     use ExtraFieldsTrait;
 
     public function __construct(
         public ?Meta $_meta = null,
     ) {}
 
-    public static function fromArray(array $data): self {
-        $meta = null;
-        if (isset($data['_meta']) && is_array($data['_meta'])) {
-            $meta = Meta::FromArray($data['_meta']);
-        }
-
-        $params = new self(_meta: $meta);
-
-        // Assign other parameters dynamically
-        foreach ($data as $key => $value) {
-            if ($key !== '_meta') {
-                $params->$key = $value;
-            }
-        }
-
-        return $params;
-    }
-
-    public function validate(): void {
+    public function validate(): void
+    {
         if ($this->_meta !== null) {
             $this->_meta->validate();
         }
     }
 
-    public function jsonSerialize(): mixed {
+    public function jsonSerialize(): mixed
+    {
         $data = [];
         // If $_meta is non-null, let it be serialized, and only add if not empty
         if ($this->_meta !== null) {

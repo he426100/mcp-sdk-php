@@ -32,20 +32,23 @@ namespace Mcp\Types;
  * Params for SubscribeRequest:
  * { uri: string }
  */
-class SubscribeRequestParams implements McpModel {
+class SubscribeRequestParams implements McpModel
+{
     use ExtraFieldsTrait;
 
     public function __construct(
         public readonly string $uri
     ) {}
 
-    public function validate(): void {
+    public function validate(): void
+    {
         if (empty($this->uri)) {
             throw new \InvalidArgumentException('Resource URI cannot be empty');
         }
     }
 
-    public function jsonSerialize(): mixed {
+    public function jsonSerialize(): mixed
+    {
         return array_merge(['uri' => $this->uri], $this->extraFields);
     }
 }

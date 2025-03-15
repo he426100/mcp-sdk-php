@@ -29,7 +29,8 @@ declare(strict_types=1);
 
 namespace Mcp\Types;
 
-class GetPromptResult extends Result {
+class GetPromptResult extends Result
+{
     /**
      * @param PromptMessage[] $messages
      */
@@ -41,7 +42,8 @@ class GetPromptResult extends Result {
         parent::__construct($_meta);
     }
 
-    public static function fromResponseData(array $data): self {
+    public static function fromResponseData(array $data): self
+    {
         // _meta
         $meta = null;
         if (isset($data['_meta'])) {
@@ -76,7 +78,8 @@ class GetPromptResult extends Result {
         return $obj;
     }
 
-    public function validate(): void {
+    public function validate(): void
+    {
         parent::validate();
         foreach ($this->messages as $message) {
             if (!$message instanceof PromptMessage) {
@@ -86,12 +89,13 @@ class GetPromptResult extends Result {
         }
     }
 
-    public function jsonSerialize(): mixed {
+    public function jsonSerialize(): mixed
+    {
         $data = parent::jsonSerialize();
         $data['messages'] = $this->messages;
         if ($this->description !== null) {
             $data['description'] = $this->description;
         }
-        return $data;
+        return array_filter($data);
     }
 }

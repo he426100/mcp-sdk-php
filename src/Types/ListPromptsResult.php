@@ -29,7 +29,8 @@ declare(strict_types=1);
 
 namespace Mcp\Types;
 
-class ListPromptsResult extends PaginatedResult {
+class ListPromptsResult extends PaginatedResult
+{
     /**
      * @param Prompt[] $prompts
      */
@@ -41,7 +42,8 @@ class ListPromptsResult extends PaginatedResult {
         parent::__construct($nextCursor, $_meta);
     }
 
-    public static function fromResponseData(array $data): self {
+    public static function fromResponseData(array $data): self
+    {
         [$meta, $nextCursor, $data] = self::extractPaginatedBase($data);
 
         $promptsData = $data['prompts'] ?? [];
@@ -66,7 +68,8 @@ class ListPromptsResult extends PaginatedResult {
         return $obj;
     }
 
-    public function validate(): void {
+    public function validate(): void
+    {
         parent::validate();
         foreach ($this->prompts as $prompt) {
             if (!$prompt instanceof Prompt) {
@@ -76,9 +79,10 @@ class ListPromptsResult extends PaginatedResult {
         }
     }
 
-    public function jsonSerialize(): mixed {
+    public function jsonSerialize(): mixed
+    {
         $data = parent::jsonSerialize();
         $data['prompts'] = $this->prompts;
-        return $data;
+        return array_filter($data);
     }
 }

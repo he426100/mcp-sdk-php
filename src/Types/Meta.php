@@ -32,24 +32,17 @@ namespace Mcp\Types;
  * Represents the `_meta` object found in various structures (e.g. Result, Request params).
  * This is an open object, so we just allow arbitrary fields.
  */
-class Meta implements McpModel {
+class Meta implements McpModel
+{
     use ExtraFieldsTrait;
 
-    public static function fromArray(array $data): self {
-        $obj = new self();
-        foreach ($data as $k => $v) {
-            $obj->$k = $v;
-        }
-
-        $obj->validate();
-        return $obj;
-    }
-
-    public function validate(): void {
+    public function validate(): void
+    {
         // No required fields, just arbitrary data allowed
     }
 
-    public function jsonSerialize(): mixed {
+    public function jsonSerialize(): mixed
+    {
         // Return only extra fields, since there are no defined properties
         return $this->extraFields;
     }

@@ -41,7 +41,6 @@ use Mcp\Types\JSONRPCError;
 use Mcp\Types\RequestParams;
 use Mcp\Types\NotificationParams;
 use Mcp\Types\Result;
-use Mcp\Types\Meta;
 use RuntimeException;
 use InvalidArgumentException;
 
@@ -223,7 +222,7 @@ class StdioServerTransport implements Transport
             } elseif ($hasMethod && $hasId && !$hasResult) {
                 // It's a JSONRPCRequest
                 $method = $data['method'];
-                $params = isset($data['params']) && is_array($data['params']) ? RequestParams::fromArray($data['params']) : null;
+                $params = isset($data['params']) && is_array($data['params']) ? $this->parseRequestParams($data['params']) : null;
 
                 $req = new JSONRPCRequest(
                     jsonrpc: '2.0',
@@ -237,7 +236,7 @@ class StdioServerTransport implements Transport
             } elseif ($hasMethod && !$hasId && !$hasResult && !$hasError) {
                 // It's a JSONRPCNotification
                 $method = $data['method'];
-                $params = isset($data['params']) && is_array($data['params']) ? NotificationParams::fromArray($data['params']) : null;
+                $params = isset($data['params']) && is_array($data['params']) ? $this->parseNotificationParams($data['params']) : null;
 
                 $not = new JSONRPCNotification(
                     jsonrpc: '2.0',
@@ -360,5 +359,69 @@ class StdioServerTransport implements Transport
     public static function create($stdin = null, $stdout = null): self
     {
         return new self($stdin, $stdout);
+    }
+
+    /**
+     * Parses request parameters from an associative array.
+     *
+     * @param array $params The parameters array from the JSON-RPC request.
+     *
+     * @return RequestParams The parsed RequestParams object.
+     */
+    private function parseRequestParams(array $params): RequestParams
+    {
+        $meta = isset($params['_meta']) ? $this->metaFromArray($params['_meta']) : null;
+
+        // Correctly passing $meta as the first argument
+        $requestParams = new RequestParams($meta);
+
+        // Assign other parameters dynamically
+        foreach ($params as $key => $value) {
+            if ($key !== '_meta') {
+                $requestParams->$key = $value;
+            }
+        }
+
+        return $requestParams;
+    }
+
+    /**
+     * Parses notification parameters from an associative array.
+     *
+     * @param array $params The parameters array from the JSON-RPC notification.
+     *
+     * @return NotificationParams The parsed NotificationParams object.
+     */
+    private function parseNotificationParams(array $params): NotificationParams
+    {
+        $meta = isset($params['_meta']) ? $this->metaFromArray($params['_meta']) : null;
+
+        // Correctly passing $meta as the first argument
+        $notificationParams = new NotificationParams($meta);
+
+        // Assign other parameters dynamically
+        foreach ($params as $key => $value) {
+            if ($key !== '_meta') {
+                $notificationParams->$key = $value;
+            }
+        }
+
+        return $notificationParams;
+    }
+
+    /**
+     * Helper method to create a Meta object from an associative array.
+     *
+     * @param array $metaArr The meta information array.
+     *
+     * @return \Mcp\Types\Meta The constructed Meta object.
+     */
+    private function metaFromArray(array $metaArr): \Mcp\Types\Meta
+    {
+        $meta = new \Mcp\Types\Meta();
+        foreach ($metaArr as $key => $value) {
+            $meta->$key = $value;
+        }
+        return $meta;
     }
 }
