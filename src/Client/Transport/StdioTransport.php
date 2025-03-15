@@ -109,15 +109,17 @@ class StdioTransport {
         stream_set_blocking($this->pipes[2], false);
 
         // Initialize read and write streams.
-        $readStream = new class($this->pipes[1], $this->logger, $this->process) extends MemoryStream {
+        $readStream = new class($this->pipes[1], $this->logger, $this->process, $this->pipes[2]) extends MemoryStream {
             private $pipe;
             private LoggerInterface $logger;
             private $process;
+            private $errPipe;
 
-            public function __construct($pipe, LoggerInterface $logger, $process) {
+            public function __construct($pipe, LoggerInterface $logger, $process, $errPipe) {
                 $this->pipe = $pipe;
                 $this->logger = $logger;
                 $this->process = $process;
+                $this->errPipe = $errPipe;
                 // Removed parent::__construct();
             }
 
@@ -136,7 +138,7 @@ class StdioTransport {
                         try {
                             $data = json_decode(trim($buffer), true, 512, JSON_THROW_ON_ERROR);
                             $jsonRpcMessage = $this->instantiateJsonRpcMessage($data);
-                            $this->logger->debug('Received JsonRpcMessage: ' . json_encode($jsonRpcMessage, JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT));
+                            $this->logger->debug('Received JsonRpcMessage: ' . $buffer);
                             return $jsonRpcMessage;
                         } catch (\JsonException $e) {
                             $this->logger->error('JSON parse error: ' . $e->getMessage());
@@ -150,6 +152,13 @@ class StdioTransport {
 
                 if (feof($this->pipe)) {
                     $this->logger->warning('Server process has terminated unexpectedly.');
+
+                    // 添加stderr检查
+                    $stderr = stream_get_contents($this->errPipe);
+                    if (!empty($stderr)) {
+                        $this->logger->error("Server STDERR: $stderr");
+                    }
+
                     return new RuntimeException('Server process terminated.');
                 }
 
