@@ -79,6 +79,6 @@ class ListPromptsResult extends PaginatedResult {
     public function jsonSerialize(): mixed {
         $data = parent::jsonSerialize();
         $data['prompts'] = $this->prompts;
-        return $data;
+        return array_filter($data);
     }
 }
