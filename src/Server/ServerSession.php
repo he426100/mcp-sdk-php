@@ -74,6 +74,10 @@ class ServerSession extends BaseSession
     private InitializationState $initializationState = InitializationState::NotInitialized;
     private ?InitializeRequestParams $clientParams = null;
     private LoggerInterface $logger;
+    /** @var callable[] */
+    private array $requestHandlers = [];
+    /** @var callable[] */
+    private array $notificationHandlers = [];
 
     public function __construct(
         private readonly Transport $transport,
