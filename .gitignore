@@ -3,3 +3,4 @@
 composer.lock
 .history/
 runtime/
+.env
