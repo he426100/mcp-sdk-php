@@ -36,7 +36,7 @@ use Monolog\Formatter\LineFormatter;
 $logger = new Logger('mcp-server');
 
 // Delete previous log
-@unlink(BASE_PATH . '/runtime/server_log.txt');
+// @unlink(BASE_PATH . '/runtime/server_log.txt');
 
 // Create a handler that writes to server_log.txt
 $handler = new StreamHandler(BASE_PATH . '/runtime/server_log.txt', Level::Debug);
