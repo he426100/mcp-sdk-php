@@ -41,6 +41,7 @@ use Mcp\Types\ClientCapabilities;
 use Mcp\Types\InitializeResult;
 use Mcp\Types\InitializeRequestParams;
 use Mcp\Types\Result;
+use Mcp\Server\InitializationState;
 use Mcp\Server\InitializationOptions;
 use Mcp\Server\Transport\Transport;
 use Mcp\Types\JSONRPCResponse;
@@ -51,16 +52,6 @@ use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use RuntimeException;
 use InvalidArgumentException;
-
-/**
- * Enumeration to represent the initialization state of the server session.
- */
-enum InitializationState: int
-{
-    case NotInitialized = 1;
-    case Initializing = 2;
-    case Initialized = 3;
-}
 
 /**
  * ServerSession manages the MCP server-side session.
