@@ -151,10 +151,6 @@ class WebSocketServerTransport implements Transport, MessageComponentInterface, 
         $this->connections[$connId] = $conn;
 
         $this->logger->debug("New WebSocket connection established: $connId");
-
-        if ($conn instanceof \Ratchet\WebSocket\WsConnection) {
-            $conn->setSubProtocol('mcp');
-        }
     }
 
     /**
@@ -194,9 +190,7 @@ class WebSocketServerTransport implements Transport, MessageComponentInterface, 
         try {
             $message = $this->buildMessage($data, $hasMethod, $hasId, $hasResult, $hasError, $id);
 
-            if ($this->session !== null) {
-                $this->session->handleIncomingMessage($message);
-            }
+            // TODO: 实现onMessage的处理
         } catch (McpError $e) {
             // Send error response
             $error = $e->error;
@@ -210,8 +204,6 @@ class WebSocketServerTransport implements Transport, MessageComponentInterface, 
                 ],
             ];
             $from->send(json_encode($errorMessage, JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE));
-        } catch (\Exception $e) {
-            $this->sendError($from, -32700, 'Parse error: ' . $e->getMessage(), $id);
         }
     }
 
@@ -267,19 +259,19 @@ class WebSocketServerTransport implements Transport, MessageComponentInterface, 
                 'jsonrpc' => '2.0',
                 'id' => $innerMessage->id->jsonSerialize(),
                 'method' => $innerMessage->method,
-                'params' => $this->serializeParams($innerMessage->params),
+                'params' => $innerMessage->params,
             ];
         } elseif ($innerMessage instanceof \Mcp\Types\JSONRPCNotification) {
             $payload = [
                 'jsonrpc' => '2.0',
                 'method' => $innerMessage->method,
-                'params' => $this->serializeParams($innerMessage->params),
+                'params' => $innerMessage->params,
             ];
         } elseif ($innerMessage instanceof \Mcp\Types\JSONRPCResponse) {
             $payload = [
                 'jsonrpc' => '2.0',
                 'id' => $innerMessage->id->jsonSerialize(),
-                'result' => $this->serializeResult($innerMessage->result),
+                'result' => $innerMessage->result,
             ];
         } elseif ($innerMessage instanceof \Mcp\Types\JSONRPCError) {
             $payload = [
@@ -463,5 +455,18 @@ class WebSocketServerTransport implements Transport, MessageComponentInterface, 
         }
 
         return $result;
+    }
+
+    /**
+     * Returns the supported WebSocket sub-protocols.
+     * 
+     * Required by WsServerInterface. Returns ['mcp'] as this transport
+     * only supports the MCP sub-protocol.
+     *
+     * @return string[] Array of supported sub-protocol names
+     */
+    public function getSubProtocols(): array
+    {
+        return ['mcp'];
     }
 }
