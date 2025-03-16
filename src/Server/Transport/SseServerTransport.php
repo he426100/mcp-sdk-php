@@ -316,6 +316,7 @@ class SseServerTransport implements Transport, SessionAwareTransport
             $this->logger->debug("Received message from session $sessionId");
 
             // Pass message to the session
+            // TODO: 这里应该send吗？
             return $message;
         } catch (McpError $e) {
             throw $e;
