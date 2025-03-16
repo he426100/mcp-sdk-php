@@ -43,6 +43,8 @@ use Mcp\Shared\McpError;
 use Mcp\Types\JsonRpcErrorObject;
 use Mcp\Types\NotificationParams;
 use Mcp\Types\ProgressNotificationParams;
+use Mcp\Types\Request;
+use Mcp\Types\Notification;
 use InvalidArgumentException;
 use RuntimeException;
 
@@ -108,12 +110,12 @@ abstract class BaseSession
 
     /**
      * Sends a request and waits for a typed result. If an error response is received, throws an exception.
-     * @param McpModel $request A typed request object (e.g., InitializeRequest, PingRequest).
+     * @param Request $request A typed request object (e.g., InitializeRequest, PingRequest).
      * @param string $resultType The fully-qualified class name of the expected result type (must implement McpModel).
      * @return McpModel The validated result object.
      * @throws McpError If an error response is received.
      */
-    public function sendRequest(McpModel $request, string $resultType): McpModel
+    public function sendRequest(Request $request, string $resultType): McpModel
     {
         $this->validateRequestObject($request);
 
@@ -164,9 +166,9 @@ abstract class BaseSession
 
     /**
      * Sends a notification. Notifications do not expect a response.
-     * @param McpModel $notification A typed notification object.
+     * @param Notification $notification A typed notification object.
      */
-    public function sendNotification(McpModel $notification): void
+    public function sendNotification(Notification $notification): void
     {
         // Convert the typed notification into a JSON-RPC notification message
         $jsonRpcNotification = new JSONRPCNotification(
