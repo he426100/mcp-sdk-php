@@ -22,7 +22,7 @@ class ExampleClientCommand extends Command
             ->setDescription('运行示例客户端')
             ->setHelp('此命令启动一个示例客户端，连接到示例服务器并列出可用的提示')
             ->addOption('cmd', 'c', InputOption::VALUE_REQUIRED)
-            ->addOption('args', 'a', InputOption::VALUE_REQUIRED);
+            ->addOption('args', 'a', InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY);
     }
 
     // 执行命令
@@ -38,7 +38,7 @@ class ExampleClientCommand extends Command
         // 创建服务器参数
         $serverParams = new StdioServerParameters(
             command: $input->getOption('cmd'),
-            args: [$input->getOption('args')],
+            args: [...(array)$input->getOption('args')],
             env: null
         );
 
