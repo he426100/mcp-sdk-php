@@ -80,7 +80,6 @@ class NotificationParams implements McpModel {
             $data = array_merge($data, $this->extraFields);
         }
         
-        // Return empty object if data is empty
-        return $data ?: new \stdClass;
+        return $data;
     }
 }
