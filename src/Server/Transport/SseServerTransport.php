@@ -277,7 +277,7 @@ class SseServerTransport implements Transport, SessionAwareTransport
 
                 $req->validate();
                 $message = new JsonRpcMessage($req);
-            } elseif ($hasMethod && !$hasId && !$hasResult && !$hasError) {
+            } elseif ($hasMethod && !$hasId && !$hasResult) {
                 // It's a JSONRPCNotification
                 $method = $data['method'];
                 $params = isset($data['params']) && is_array($data['params']) ? NotificationParams::fromArray($data['params']) : null;
@@ -290,7 +290,7 @@ class SseServerTransport implements Transport, SessionAwareTransport
 
                 $not->validate();
                 $message = new JsonRpcMessage($not);
-            } elseif ($hasId && $hasResult && !$hasMethod && !$hasError) {
+            } elseif ($hasId && $hasResult && !$hasMethod) {
                 // It's a JSONRPCResponse
                 $resultData = $data['result'];
                 $result = $this->buildResult($resultData);
@@ -364,42 +364,12 @@ class SseServerTransport implements Transport, SessionAwareTransport
      * Note: SSE does not provide a direct way to read messages from the client.
      * Incoming messages are handled via `handlePostRequest`.
      *
-     * @throws RuntimeException Always, since reading is handled differently.
-     *
      * @return JsonRpcMessage|null Always returns null.
      */
     public function readMessage(): ?JsonRpcMessage
     {
         // SSE is unidirectional (server to client), reading is handled via POST requests
         return null;
-    }
-
-    /**
-     * Processes a JSONRPCRequest message.
-     *
-     * @param JSONRPCRequest $request The JSON-RPC request to process.
-     *
-     * @throws McpError If processing fails.
-     *
-     * @return void
-     */
-    private function processRequest(JSONRPCRequest $request): void
-    {
-        // This method can be implemented to handle requests if needed.
-        // Currently, incoming requests are handled via `handlePostRequest`.
-    }
-
-    /**
-     * Processes a JSONRPCNotification message.
-     *
-     * @param JSONRPCNotification $notification The JSON-RPC notification to process.
-     *
-     * @return void
-     */
-    private function processNotification(JSONRPCNotification $notification): void
-    {
-        // This method can be implemented to handle notifications if needed.
-        // Currently, incoming notifications are handled via `handlePostRequest`.
     }
 
     /**

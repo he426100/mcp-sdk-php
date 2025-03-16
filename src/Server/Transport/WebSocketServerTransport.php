@@ -202,7 +202,7 @@ class WebSocketServerTransport implements Transport, MessageComponentInterface, 
             $error = $e->error;
             $errorMessage = [
                 'jsonrpc' => '2.0',
-                'id' => $id ? $id->toString() : null,
+                'id' => $id ? $id->jsonSerialize() : null,
                 'error' => [
                     'code' => $error->code,
                     'message' => $error->message,
@@ -265,7 +265,7 @@ class WebSocketServerTransport implements Transport, MessageComponentInterface, 
         if ($innerMessage instanceof \Mcp\Types\JSONRPCRequest) {
             $payload = [
                 'jsonrpc' => '2.0',
-                'id' => $innerMessage->id->toString(),
+                'id' => $innerMessage->id->jsonSerialize(),
                 'method' => $innerMessage->method,
                 'params' => $this->serializeParams($innerMessage->params),
             ];
@@ -278,13 +278,13 @@ class WebSocketServerTransport implements Transport, MessageComponentInterface, 
         } elseif ($innerMessage instanceof \Mcp\Types\JSONRPCResponse) {
             $payload = [
                 'jsonrpc' => '2.0',
-                'id' => $innerMessage->id->toString(),
+                'id' => $innerMessage->id->jsonSerialize(),
                 'result' => $this->serializeResult($innerMessage->result),
             ];
         } elseif ($innerMessage instanceof \Mcp\Types\JSONRPCError) {
             $payload = [
                 'jsonrpc' => '2.0',
-                'id' => $innerMessage->id ? $innerMessage->id->toString() : null,
+                'id' => $innerMessage->id->jsonSerialize(),
                 'error' => [
                     'code' => $innerMessage->error->code,
                     'message' => $innerMessage->error->message,
@@ -334,7 +334,7 @@ class WebSocketServerTransport implements Transport, MessageComponentInterface, 
     {
         $errorPayload = [
             'jsonrpc' => '2.0',
-            'id' => $id ? (string)$id : null,
+            'id' => $id ? $id->jsonSerialize() : null,
             'error' => [
                 'code' => $code,
                 'message' => $message,
@@ -405,7 +405,7 @@ class WebSocketServerTransport implements Transport, MessageComponentInterface, 
 
             $req->validate();
             return new JsonRpcMessage($req);
-        } elseif ($hasMethod && !$hasId && !$hasResult && !$hasError) {
+        } elseif ($hasMethod && !$hasId && !$hasResult) {
             // It's a JSONRPCNotification
             $method = $data['method'];
             $params = isset($data['params']) && is_array($data['params']) ? NotificationParams::fromArray($data['params']) : null;
@@ -418,7 +418,7 @@ class WebSocketServerTransport implements Transport, MessageComponentInterface, 
 
             $not->validate();
             return new JsonRpcMessage($not);
-        } elseif ($hasId && $hasResult && !$hasMethod && !$hasError) {
+        } elseif ($hasId && $hasResult && !$hasMethod) {
             // It's a JSONRPCResponse
             $result = $this->buildResult($data['result']);
 

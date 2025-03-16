@@ -234,7 +234,7 @@ class StdioServerTransport implements Transport
 
                 $req->validate();
                 return new JsonRpcMessage($req);
-            } elseif ($hasMethod && !$hasId && !$hasResult && !$hasError) {
+            } elseif ($hasMethod && !$hasId && !$hasResult) {
                 // It's a JSONRPCNotification
                 $method = $data['method'];
                 $params = isset($data['params']) && is_array($data['params']) ? NotificationParams::fromArray($data['params']) : null;
@@ -247,7 +247,7 @@ class StdioServerTransport implements Transport
 
                 $not->validate();
                 return new JsonRpcMessage($not);
-            } elseif ($hasId && $hasResult && !$hasMethod && !$hasError) {
+            } elseif ($hasId && $hasResult && !$hasMethod) {
                 // It's a JSONRPCResponse
                 $resultData = $data['result'];
 
