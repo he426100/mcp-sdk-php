@@ -41,6 +41,6 @@ class SamplingCapability implements McpModel {
 
     public function jsonSerialize(): mixed {
         // Just return extra fields (arbitrary fields)
-        return $this->extraFields;
+        return $this->extraFields ?: new \stdClass;
     }
 }

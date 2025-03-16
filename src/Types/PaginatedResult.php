@@ -43,11 +43,21 @@ class PaginatedResult extends Result {
     }
 
     public function jsonSerialize(): mixed {
+        // Get data from parent (which now handles empty objects correctly)
         $data = parent::jsonSerialize();
+        
+        // Convert stdClass to array if needed
+        if ($data instanceof \stdClass) {
+            $data = (array)$data;
+        }
+        
+        // Add nextCursor if it exists
         if ($this->nextCursor !== null) {
             $data['nextCursor'] = $this->nextCursor;
         }
-        return $data;
+        
+        // Return empty object if data is empty
+        return !empty($data) ? $data : new \stdClass();
     }
 
     /**

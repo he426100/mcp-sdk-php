@@ -54,6 +54,6 @@ class ToolInputProperties implements McpModel {
     }
 
     public function jsonSerialize(): mixed {
-        return $this->extraFields;
+        return $this->extraFields ?: new \stdClass;
     }
 }
