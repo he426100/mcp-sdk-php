@@ -21,6 +21,11 @@ use Mcp\Types\ToolInputProperties;
 
 class MySqlServerCommand extends Command
 {
+    private string $host;
+    private string $username;
+    private string $password;
+    private string $database;
+
     // 配置命令
     protected function configure(): void
     {
@@ -61,11 +66,10 @@ class MySqlServerCommand extends Command
     // 执行命令
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        // 设置数据库连接环境变量
-        putenv('DB_HOST=' . $input->getOption('host'));
-        putenv('DB_USERNAME=' . $input->getOption('username'));
-        putenv('DB_PASSWORD=' . $input->getOption('password'));
-        putenv('DB_DATABASE=' . $input->getOption('database'));
+        $this->host = getenv('DB_HOST') ?: $input->getOption('host') ?: 'localhost';
+        $this->username = getenv('DB_USERNAME') ?: $input->getOption('username') ?: 'root';
+        $this->password = getenv('DB_PASSWORD') ?: $input->getOption('password') ?: '';
+        $this->database = getenv('DB_DATABASE') ?: $input->getOption('database') ?: 'mysql';
 
         // 创建日志记录器
         $logger = LoggerService::createLogger(
@@ -199,24 +203,19 @@ class MySqlServerCommand extends Command
      */
     private function getDatabaseConnection()
     {
-        $host = getenv('DB_HOST') ?: 'localhost';
-        $username = getenv('DB_USERNAME') ?: 'root';
-        $password = getenv('DB_PASSWORD') ?: '';
-        $database = getenv('DB_DATABASE') ?: 'mysql';
-
         // 验证环境变量
-        if (!$username || !$database) {
+        if (!$this->username || !$this->database) {
             throw new \Exception("数据库连接信息不完整，请设置必要的环境变量");
         }
 
         try {
-            $dsn = "mysql:host=$host;dbname=$database;charset=utf8mb4";
+            $dsn = "mysql:host={$this->host};dbname={$this->database};charset=utf8mb4";
             $options = [
                 \PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION,
                 \PDO::ATTR_DEFAULT_FETCH_MODE => \PDO::FETCH_ASSOC,
                 \PDO::ATTR_EMULATE_PREPARES => false,
             ];
-            return new \PDO($dsn, $username, $password, $options);
+            return new \PDO($dsn, $this->username, $this->password, $options);
         } catch (\PDOException $e) {
             throw new \Exception("数据库连接失败: " . $e->getMessage());
         }
