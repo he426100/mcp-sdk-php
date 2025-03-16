@@ -21,13 +21,8 @@ class ExampleClientCommand extends Command
             ->setName('mcp:example-client')
             ->setDescription('运行示例客户端')
             ->setHelp('此命令启动一个示例客户端，连接到示例服务器并列出可用的提示')
-            ->addOption(
-                'server-script',
-                's',
-                InputOption::VALUE_REQUIRED,
-                '要连接的服务器脚本路径',
-                BASE_PATH . '/examples/example_server.php'
-            );
+            ->addOption('cmd', 'c', InputOption::VALUE_REQUIRED)
+            ->addOption('args', 'a', InputOption::VALUE_REQUIRED);
     }
 
     // 执行命令
@@ -40,13 +35,10 @@ class ExampleClientCommand extends Command
             true
         );
 
-        // 获取服务器脚本路径
-        $serverScript = $input->getOption('server-script');
-
         // 创建服务器参数
         $serverParams = new StdioServerParameters(
-            command: 'php',
-            args: [$serverScript],
+            command: $input->getOption('cmd'),
+            args: [$input->getOption('args')],
             env: null
         );
 
