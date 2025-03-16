@@ -10,6 +10,8 @@ ini_set('error_log', __DIR__ . '/php_errors.log'); // Logs errors to a file
 ini_set('memory_limit', '2G');
 error_reporting(E_ALL);
 
+date_default_timezone_set('PRC');
+
 ! defined('BASE_PATH') && define('BASE_PATH', dirname(__DIR__, 1));
 require BASE_PATH . '/vendor/autoload.php';
 
