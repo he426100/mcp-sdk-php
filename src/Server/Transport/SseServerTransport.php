@@ -194,9 +194,9 @@ class SseServerTransport implements Transport, SessionAwareTransport
      * @throws McpError              If parsing or validation fails.
      * @throws RuntimeException       If the transport is not started or the session is invalid.
      *
-     * @return void
+     * @return JsonRpcMessage|null
      */
-    public function handlePostRequest(string $sessionId, string $content): void
+    public function handlePostRequest(string $sessionId, string $content): ?JsonRpcMessage
     {
         if (!$this->isStarted) {
             throw new RuntimeException('Transport not started');
@@ -316,9 +316,7 @@ class SseServerTransport implements Transport, SessionAwareTransport
             $this->logger->debug("Received message from session $sessionId");
 
             // Pass message to the session
-            if ($this->session !== null) {
-                $this->session->handleIncomingMessage($message);
-            }
+            return $message;
         } catch (McpError $e) {
             throw $e;
         } catch (\Exception $e) {
