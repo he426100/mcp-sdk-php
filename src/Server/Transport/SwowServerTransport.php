@@ -86,7 +86,7 @@ class SwowServerTransport implements Transport
     public function start(): void
     {
         if ($this->isStarted) {
-            throw new RuntimeException('传输层已经启动');
+            throw new RuntimeException('Transport already started');
         }
 
         $this->isStarted = true;
@@ -126,7 +126,7 @@ class SwowServerTransport implements Transport
     public function readMessage(): ?JsonRpcMessage
     {
         if (!$this->isStarted) {
-            throw new RuntimeException('传输层未启动');
+            throw new RuntimeException('Transport not started');
         }
 
         try {
@@ -147,7 +147,7 @@ class SwowServerTransport implements Transport
             throw new McpError(
                 new TypesErrorData(
                     code: -32700,
-                    message: '解析错误: ' . $e->getMessage()
+                    message: 'Parse error: ' . $e->getMessage()
                 )
             );
         } catch (\Exception $e) {
@@ -155,7 +155,7 @@ class SwowServerTransport implements Transport
             if ($e->getMessage() === 'Operation timed out') {
                 return null; // 超时表示没有可用消息
             }
-            throw new RuntimeException('读取消息失败: ' . $e->getMessage());
+            throw new RuntimeException('Failed to read from stdin: ' . $e->getMessage());
         }
 
         // 验证 'jsonrpc' 字段
@@ -163,7 +163,7 @@ class SwowServerTransport implements Transport
             throw new McpError(
                 new TypesErrorData(
                     code: -32600,
-                    message: '无效请求: jsonrpc 版本必须为 "2.0"'
+                    message: 'Invalid Request: jsonrpc version must be "2.0"'
                 )
             );
         }
@@ -188,7 +188,7 @@ class SwowServerTransport implements Transport
                     throw new McpError(
                         new TypesErrorData(
                             code: -32600,
-                            message: '无效请求: 错误对象必须包含 code 和 message'
+                            message: 'Invalid Request: error object must contain code and message'
                         )
                     );
                 }
@@ -259,7 +259,7 @@ class SwowServerTransport implements Transport
                 throw new McpError(
                     new TypesErrorData(
                         code: -32600,
-                        message: '无效请求: 无法确定消息类型'
+                        message: 'Invalid Request: Could not determine message type'
                     )
                 );
             }
@@ -271,7 +271,7 @@ class SwowServerTransport implements Transport
             throw new McpError(
                 new TypesErrorData(
                     code: -32700,
-                    message: '解析错误: ' . $e->getMessage()
+                    message: 'Parse error: ' . $e->getMessage()
                 )
             );
         }
@@ -286,20 +286,20 @@ class SwowServerTransport implements Transport
     public function writeMessage(JsonRpcMessage $message): void
     {
         if (!$this->isStarted) {
-            throw new RuntimeException('传输层未启动');
+            throw new RuntimeException('Transport not started');
         }
 
         // 将 JsonRpcMessage 编码为 JSON
         $json = json_encode($message, JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE);
         if ($json === false) {
-            throw new RuntimeException('消息编码为 JSON 失败: ' . json_last_error_msg());
+            throw new RuntimeException('Failed to encode message as JSON: ' . json_last_error_msg());
         }
 
         try {
             // 使用 EofStream 发送消息（会自动添加配置的 EOF）
             $this->output->sendMessage($json, 0, strlen($json), null);
         } catch (\Exception $e) {
-            throw new RuntimeException('写入输出流失败: ' . $e->getMessage());
+            throw new RuntimeException('Failed to write to stdout: ' . $e->getMessage());
         }
     }
 
