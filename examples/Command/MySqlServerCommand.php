@@ -24,6 +24,7 @@ use Mcp\Types\ListResourcesResult;
 use Mcp\Types\ReadResourceResult;
 use Mcp\Types\ResourceTemplate;
 use Mcp\Types\ListResourceTemplatesResult;
+use Mcp\Types\TextResourceContents;
 
 class MySqlServerCommand extends Command
 {
@@ -573,11 +574,11 @@ class MySqlServerCommand extends Command
             return new ReadResourceResult(
                 contents: [
                     // 使用一个包含所有必需字段的对象，不是 TextContent
-                    [
-                        "uri" => $resourceUri,
-                        "mimeType" => $mimeType,
-                        "text" => $content
-                    ]
+                    new TextResourceContents(
+                        uri: $resourceUri,
+                        mimeType: $mimeType,
+                        text: $content
+                    ),
                 ],
             );
         } catch (\Exception $e) {
