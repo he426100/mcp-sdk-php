@@ -18,6 +18,9 @@ use Mcp\Types\CallToolRequestParams;
 use Mcp\Types\Content;
 use Mcp\Types\ToolInputSchema;
 use Mcp\Types\ToolInputProperties;
+use Mcp\Types\Resource;
+use Mcp\Types\ListResourcesResult;
+use Mcp\Types\ReadResourceResult;
 
 class MySqlServerCommand extends Command
 {
@@ -177,6 +180,30 @@ class MySqlServerCommand extends Command
                     content: [new TextContent(text: "执行失败: " . $e->getMessage())],
                     isError: true
                 );
+            }
+        });
+
+        // 注册资源列表处理器
+        $server->registerHandler('resources/list', function ($params) use ($logger) {
+            try {
+                return $this->handleResourcesList($logger);
+            } catch (\Exception $e) {
+                $logger->error("资源列表获取失败", ['exception' => $e->getMessage()]);
+                throw $e;
+            }
+        });
+
+        // 注册资源读取处理器
+        $server->registerHandler('resources/read', function ($params) use ($logger) {
+            try {
+                if (!isset($params->uri)) {
+                    throw new \InvalidArgumentException("缺少必要参数: uri");
+                }
+                
+                return $this->handleResourceRead($params->uri, $logger);
+            } catch (\Exception $e) {
+                $logger->error("资源读取失败", ['exception' => $e->getMessage()]);
+                throw $e;
             }
         });
 
@@ -406,5 +433,332 @@ class MySqlServerCommand extends Command
             ]);
             throw $e; // 让上层处理错误
         }
+    }
+
+    /**
+     * 处理resources/list请求，返回可用的数据库资源列表
+     * 
+     * @param mixed $logger 日志记录器
+     * @return ListResourcesResult 资源列表结果
+     * @throws \Exception 当获取资源列表失败时抛出
+     */
+    private function handleResourcesList($logger)
+    {
+        try {
+            $pdo = $this->getDatabaseConnection();
+            
+            // 获取所有表
+            $stmt = $pdo->query('SHOW TABLES');
+            $tables = $stmt->fetchAll(\PDO::FETCH_COLUMN);
+            
+            // 获取所有视图（如果有）
+            $views = [];
+            try {
+                $stmt = $pdo->query("SELECT TABLE_NAME FROM INFORMATION_SCHEMA.VIEWS WHERE TABLE_SCHEMA = '{$this->database}'");
+                $views = $stmt->fetchAll(\PDO::FETCH_COLUMN);
+            } catch (\Exception $e) {
+                $logger->warning("获取视图列表失败", ['exception' => $e->getMessage()]);
+                // 继续执行，不中断流程
+            }
+            
+            // 创建资源列表
+            $resources = [];
+            
+            // 添加表资源
+            foreach ($tables as $table) {
+                $resources[] = new Resource(
+                    uri: "mysql://{$this->database}/table/{$table}",
+                    name: $table,
+                    mimeType: "application/x.mysql-table",
+                    description: "数据库表：{$table}"
+                );
+            }
+            
+            // 添加视图资源
+            foreach ($views as $view) {
+                $resources[] = new Resource(
+                    uri: "mysql://{$this->database}/view/{$view}",
+                    name: $view,
+                    mimeType: "application/x.mysql-view",
+                    description: "数据库视图：{$view}"
+                );
+            }
+            
+            // 添加数据库信息资源
+            $resources[] = new Resource(
+                uri: "mysql://{$this->database}/info",
+                name: "数据库信息",
+                mimeType: "text/plain",
+                description: "当前数据库概述信息"
+            );
+            
+            // 清理可能的大型对象以减少内存使用
+            $stmt = null;
+            
+            return new ListResourcesResult($resources);
+        } catch (\Exception $e) {
+            $logger->error("获取资源列表失败", ['exception' => $e->getMessage()]);
+            throw $e;
+        }
+    }
+    
+    /**
+     * 处理resources/read请求，读取特定资源的内容
+     * 
+     * @param string $resourceUri 资源URI
+     * @param mixed $logger 日志记录器
+     * @return ReadResourceResult 资源读取结果
+     * @throws \Exception 当读取资源失败时抛出
+     */
+    private function handleResourceRead($resourceUri, $logger)
+    {
+        try {
+            $pdo = $this->getDatabaseConnection();
+            
+            // 解析资源URI
+            if (strpos($resourceUri, 'mysql://') !== 0) {
+                throw new \InvalidArgumentException("无效的资源URI格式，应以'mysql://'开头");
+            }
+            
+            $path = substr($resourceUri, strlen('mysql://'));
+            $parts = explode('/', $path);
+            
+            // 确保格式正确
+            if (count($parts) < 2) {
+                throw new \InvalidArgumentException("无效的资源URI格式，应为'mysql://database/type/name'");
+            }
+            
+            // 验证数据库是否匹配
+            $uriDatabase = $parts[0];
+            if ($uriDatabase !== $this->database) {
+                throw new \InvalidArgumentException("请求的数据库与当前连接不匹配");
+            }
+            
+            $type = $parts[1];
+            $name = $parts[2] ?? '';
+            
+            $content = null;
+            $mimeType = "text/plain";
+            
+            switch ($type) {
+                case 'table':
+                    // 获取表结构和前100行数据
+                    $content = $this->getTableContent($pdo, $name, $logger);
+                    break;
+                    
+                case 'view':
+                    // 获取视图结构和前100行数据
+                    $content = $this->getViewContent($pdo, $name, $logger);
+                    break;
+                    
+                case 'info':
+                    $content = $this->getDatabaseInfo($pdo, $logger);
+                    break;
+                    
+                default:
+                    throw new \InvalidArgumentException("未知的资源类型: {$type}");
+            }
+            
+            return new ReadResourceResult(
+                contents: [new TextContent(text: $content)],
+            );
+        } catch (\Exception $e) {
+            $logger->error("读取资源失败", ['resourceUri' => $resourceUri, 'exception' => $e->getMessage()]);
+            throw $e;
+        }
+    }
+    
+    /**
+     * 获取表的内容（结构和数据）
+     */
+    private function getTableContent($pdo, $tableName, $logger)
+    {
+        // 验证表名
+        if (!preg_match('/^[a-zA-Z0-9_]+$/', $tableName)) {
+            throw new \InvalidArgumentException("无效的表名");
+        }
+        
+        // 获取表结构
+        $stmt = $pdo->prepare('DESCRIBE ' . $tableName);
+        $stmt->execute();
+        $columns = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        
+        // 获取表数据（前100行）
+        $stmt = $pdo->prepare("SELECT * FROM {$tableName} LIMIT 100");
+        $stmt->execute();
+        $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        
+        // 格式化输出
+        $result = "# 表 '{$tableName}' 详情\n\n";
+        
+        // 表结构
+        $result .= "## 表结构\n\n";
+        $result .= "| 字段 | 类型 | 允许为空 | 键 | 默认值 | 额外 |\n";
+        $result .= "|------|------|----------|-----|--------|------|\n";
+        
+        foreach ($columns as $column) {
+            $result .= "| " . $column['Field'] . " | "
+                . $column['Type'] . " | "
+                . $column['Null'] . " | "
+                . $column['Key'] . " | "
+                . ($column['Default'] === null ? 'NULL' : $column['Default']) . " | "
+                . $column['Extra'] . " |\n";
+        }
+        
+        // 表数据
+        $result .= "\n## 表数据（前100行）\n\n";
+        
+        if (empty($rows)) {
+            $result .= "表中没有数据。\n";
+        } else {
+            // 提取列名
+            $headers = array_keys($rows[0]);
+            $result .= "| " . implode(" | ", $headers) . " |\n";
+            $result .= "| " . implode(" | ", array_map(function() { return "------"; }, $headers)) . " |\n";
+            
+            // 添加数据行
+            foreach ($rows as $row) {
+                $result .= "| " . implode(" | ", array_map(function ($val) {
+                    if ($val === null) {
+                        return 'NULL';
+                    } elseif (is_string($val) && mb_strlen($val) > 50) {
+                        // 截断过长的文本
+                        return mb_substr($val, 0, 47) . '...';
+                    } else {
+                        return (string)$val;
+                    }
+                }, $row)) . " |\n";
+            }
+        }
+        
+        return $result;
+    }
+    
+    /**
+     * 获取视图的内容（结构和数据）
+     */
+    private function getViewContent($pdo, $viewName, $logger)
+    {
+        // 验证视图名
+        if (!preg_match('/^[a-zA-Z0-9_]+$/', $viewName)) {
+            throw new \InvalidArgumentException("无效的视图名");
+        }
+        
+        // 获取视图定义
+        $stmt = $pdo->prepare("SELECT VIEW_DEFINITION FROM INFORMATION_SCHEMA.VIEWS 
+                               WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ?");
+        $stmt->execute([$this->database, $viewName]);
+        $viewDef = $stmt->fetch(\PDO::FETCH_COLUMN);
+        
+        if (!$viewDef) {
+            throw new \Exception("视图 '{$viewName}' 不存在或无法访问其定义");
+        }
+        
+        // 获取视图数据（前100行）
+        $stmt = $pdo->prepare("SELECT * FROM {$viewName} LIMIT 100");
+        $stmt->execute();
+        $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        
+        // 格式化输出
+        $result = "# 视图 '{$viewName}' 详情\n\n";
+        
+        // 视图定义
+        $result .= "## 视图定义\n\n";
+        $result .= "```sql\n";
+        $result .= $viewDef . "\n";
+        $result .= "```\n\n";
+        
+        // 视图数据
+        $result .= "## 视图数据（前100行）\n\n";
+        
+        if (empty($rows)) {
+            $result .= "视图中没有数据。\n";
+        } else {
+            // 提取列名
+            $headers = array_keys($rows[0]);
+            $result .= "| " . implode(" | ", $headers) . " |\n";
+            $result .= "| " . implode(" | ", array_map(function() { return "------"; }, $headers)) . " |\n";
+            
+            // 添加数据行
+            foreach ($rows as $row) {
+                $result .= "| " . implode(" | ", array_map(function ($val) {
+                    if ($val === null) {
+                        return 'NULL';
+                    } elseif (is_string($val) && mb_strlen($val) > 50) {
+                        // 截断过长的文本
+                        return mb_substr($val, 0, 47) . '...';
+                    } else {
+                        return (string)$val;
+                    }
+                }, $row)) . " |\n";
+            }
+        }
+        
+        return $result;
+    }
+    
+    /**
+     * 获取数据库概述信息
+     */
+    private function getDatabaseInfo($pdo, $logger)
+    {
+        // 获取数据库大小
+        try {
+            $stmt = $pdo->prepare("SELECT 
+                table_schema as `数据库`,
+                round(sum(data_length + index_length) / 1024 / 1024, 2) as `大小(MB)` 
+                FROM information_schema.TABLES 
+                WHERE table_schema = ?
+                GROUP BY table_schema");
+            $stmt->execute([$this->database]);
+            $dbSize = $stmt->fetch(\PDO::FETCH_ASSOC);
+        } catch (\Exception $e) {
+            $logger->warning("获取数据库大小失败", ['exception' => $e->getMessage()]);
+            $dbSize = ['大小(MB)' => '无法获取'];
+        }
+        
+        // 获取表和视图统计
+        try {
+            $stmt = $pdo->query("SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES 
+                                WHERE TABLE_SCHEMA = '{$this->database}' AND TABLE_TYPE = 'BASE TABLE'");
+            $tableCount = $stmt->fetchColumn();
+            
+            $stmt = $pdo->query("SELECT COUNT(*) FROM INFORMATION_SCHEMA.VIEWS 
+                                WHERE TABLE_SCHEMA = '{$this->database}'");
+            $viewCount = $stmt->fetchColumn();
+        } catch (\Exception $e) {
+            $logger->warning("获取表和视图计数失败", ['exception' => $e->getMessage()]);
+            $tableCount = '无法获取';
+            $viewCount = '无法获取';
+        }
+        
+        // 获取字符集和排序规则
+        try {
+            $stmt = $pdo->query("SELECT DEFAULT_CHARACTER_SET_NAME, DEFAULT_COLLATION_NAME 
+                                FROM INFORMATION_SCHEMA.SCHEMATA 
+                                WHERE SCHEMA_NAME = '{$this->database}'");
+            $charsetInfo = $stmt->fetch(\PDO::FETCH_ASSOC);
+        } catch (\Exception $e) {
+            $logger->warning("获取字符集信息失败", ['exception' => $e->getMessage()]);
+            $charsetInfo = [
+                'DEFAULT_CHARACTER_SET_NAME' => '无法获取',
+                'DEFAULT_COLLATION_NAME' => '无法获取'
+            ];
+        }
+        
+        // 格式化输出
+        $result = "# 数据库 '{$this->database}' 概述\n\n";
+        $result .= "## 基本信息\n\n";
+        $result .= "| 项目 | 值 |\n";
+        $result .= "|------|------|\n";
+        $result .= "| 数据库名称 | {$this->database} |\n";
+        $result .= "| 数据库大小 | " . ($dbSize['大小(MB)'] ?? '无法获取') . " MB |\n";
+        $result .= "| 表数量 | {$tableCount} |\n";
+        $result .= "| 视图数量 | {$viewCount} |\n";
+        $result .= "| 默认字符集 | " . ($charsetInfo['DEFAULT_CHARACTER_SET_NAME'] ?? '无法获取') . " |\n";
+        $result .= "| 默认排序规则 | " . ($charsetInfo['DEFAULT_COLLATION_NAME'] ?? '无法获取') . " |\n";
+        $result .= "| 主机 | {$this->host} |\n";
+        
+        return $result;
     }
 }
