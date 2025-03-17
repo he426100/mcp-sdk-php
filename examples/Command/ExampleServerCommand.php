@@ -39,8 +39,6 @@ class ExampleServerCommand extends Command
             false
         );
 
-        $output->writeln("<info>创建服务器实例</info>");
-
         // 创建服务器实例
         $server = new Server('example-server', $logger);
 
@@ -101,11 +99,9 @@ class ExampleServerCommand extends Command
         $runner = new ServerRunner($server, $initOptions, $logger);
 
         try {
-            $output->writeln("<info>启动服务器</info>");
             $runner->run();
             return Command::SUCCESS;
         } catch (\Throwable $e) {
-            $output->writeln("<error>发生错误: " . $e->getMessage() . "</error>");
             $logger->error("服务器运行失败", ['exception' => $e]);
             return Command::FAILURE;
         }

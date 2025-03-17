@@ -84,8 +84,6 @@ class MySqlServerCommand extends Command
             false
         );
 
-        $output->writeln("<info>创建MySQL工具服务器</info>");
-
         // 创建服务器实例
         $server = new Server('mysql-server', $logger);
 
@@ -225,11 +223,9 @@ class MySqlServerCommand extends Command
         $runner = new ServerRunner($server, $initOptions, $logger);
 
         try {
-            $output->writeln("<info>启动MySQL工具服务器</info>");
             $runner->run();
             return Command::SUCCESS;
         } catch (\Throwable $e) {
-            $output->writeln("<error>发生错误: " . $e->getMessage() . "</error>");
             $logger->error("服务器运行失败", ['exception' => $e]);
             return Command::FAILURE;
         }
