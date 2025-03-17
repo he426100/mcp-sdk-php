@@ -44,6 +44,7 @@ namespace Mcp\Types;
  *   | CallToolRequest
  *   | SetLevelRequest
  *   | CompleteRequest
+ *   | ListResourceTemplatesRequest
  *
  * This acts as a root model for that union and provides a factory method
  * to construct the correct request variant based on the method name and params.
@@ -69,7 +70,8 @@ class ClientRequest implements McpModel {
             $request instanceof ListToolsRequest ||
             $request instanceof CallToolRequest ||
             $request instanceof SetLevelRequest ||
-            $request instanceof CompleteRequest
+            $request instanceof CompleteRequest ||
+            $request instanceof ListResourceTemplatesRequest
         )) {
             throw new \InvalidArgumentException('Invalid client request type');
         }
@@ -97,6 +99,7 @@ class ClientRequest implements McpModel {
             'resources/read' => self::createReadResourceRequest($params),
             'resources/subscribe' => self::createSubscribeRequest($params),
             'resources/unsubscribe' => self::createUnsubscribeRequest($params),
+            'resources/templates/list' => self::createListResourceTemplatesRequest($params),
             'tools/call' => self::createCallToolRequest($params),
             'tools/list' => self::createListToolsRequest($params),
             default => throw new \InvalidArgumentException("Unknown client request method: $method")
@@ -227,6 +230,11 @@ class ClientRequest implements McpModel {
     private static function createListResourcesRequest(array $params): self {
         $cursor = $params['cursor'] ?? null;
         return new self(new ListResourcesRequest($cursor));
+    }
+
+    private static function createListResourceTemplatesRequest(array $params): self {
+        $cursor = $params['cursor'] ?? null;
+        return new self(new ListResourceTemplatesRequest($cursor));
     }
 
     private static function createReadResourceRequest(array $params): self {

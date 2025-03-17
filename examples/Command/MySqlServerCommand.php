@@ -22,6 +22,8 @@ use Mcp\Types\ToolInputProperties;
 use Mcp\Types\Resource;
 use Mcp\Types\ListResourcesResult;
 use Mcp\Types\ReadResourceResult;
+use Mcp\Types\ResourceTemplate;
+use Mcp\Types\ListResourceTemplatesResult;
 
 class MySqlServerCommand extends Command
 {
@@ -204,6 +206,16 @@ class MySqlServerCommand extends Command
                 return $this->handleResourceRead($params->uri, $logger);
             } catch (\Exception $e) {
                 $logger->error("资源读取失败", ['exception' => $e->getMessage()]);
+                throw $e;
+            }
+        });
+
+        // 注册资源模板列表处理器
+        $server->registerHandler('resources/templates/list', function ($params) use ($logger) {
+            try {
+                return $this->handleResourceTemplatesList($logger);
+            } catch (\Exception $e) {
+                $logger->error("资源模板列表获取失败", ['exception' => $e->getMessage()]);
                 throw $e;
             }
         });
@@ -770,5 +782,46 @@ class MySqlServerCommand extends Command
         $result .= "| 主机 | {$this->host} |\n";
         
         return $result;
+    }
+
+    /**
+     * 处理resources/templates/list请求，返回可用的资源模板列表
+     * 
+     * @param mixed $logger 日志记录器
+     * @return ListResourceTemplatesResult 资源模板列表结果
+     * @throws \Exception 当获取资源模板列表失败时抛出
+     */
+    private function handleResourceTemplatesList($logger)
+    {
+        try {
+            // 定义资源模板
+            $resourceTemplates = [
+                new ResourceTemplate(
+                    name: "表结构与数据",
+                    uriTemplate: "mysql://{$this->database}/table/{tableName}",
+                    description: "获取指定数据库表的结构和数据",
+                    mimeType: "text/plain"
+                ),
+                new ResourceTemplate(
+                    name: "视图结构与数据",
+                    uriTemplate: "mysql://{$this->database}/view/{viewName}",
+                    description: "获取指定数据库视图的定义和数据",
+                    mimeType: "text/plain"
+                ),
+                new ResourceTemplate(
+                    name: "SQL查询结果",
+                    uriTemplate: "mysql://{$this->database}/query/{sql}",
+                    description: "执行自定义SQL查询并获取结果（仅支持SELECT语句）",
+                    mimeType: "text/plain"
+                )
+            ];
+            
+            $logger->info("已返回资源模板列表", ['count' => count($resourceTemplates)]);
+            
+            return new ListResourceTemplatesResult($resourceTemplates);
+        } catch (\Exception $e) {
+            $logger->error("获取资源模板列表失败", ['exception' => $e->getMessage()]);
+            throw $e;
+        }
     }
 }
