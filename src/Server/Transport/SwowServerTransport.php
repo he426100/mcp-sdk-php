@@ -57,10 +57,10 @@ class SwowServerTransport implements Transport
 {
     /** @var EofStream 输入流 */
     private EofStream $input;
-    
+
     /** @var EofStream 输出流 */
     private EofStream $output;
-    
+
     /** @var bool 是否已启动 */
     private bool $isStarted = false;
 
@@ -105,6 +105,18 @@ class SwowServerTransport implements Transport
     }
 
     /**
+     * 检查输入流是否有数据可读
+     *
+     * @return bool 有数据可读时返回 true，否则返回 false
+     */
+    public function hasDataAvailable(): bool
+    {
+        $buffer = new Buffer(1);
+        $bytesRead = $this->input->peek($buffer, 0, 1, 0);
+        return $bytesRead > 0;
+    }
+
+    /**
      * 从输入流读取下一条 JSON-RPC 消息
      *
      * @return JsonRpcMessage|null 如果有可用消息则返回，否则返回 null
@@ -121,13 +133,13 @@ class SwowServerTransport implements Transport
             // 使用 EofStream 的消息接收功能
             $buffer = new Buffer(0);
             $messageLength = $this->input->recvMessage($buffer);
-            
+
             if ($messageLength <= 0) {
                 return null; // 没有可用数据
             }
-            
+
             $line = $buffer->toString();
-            
+
             // 解码 JSON 并进行严格错误处理
             $data = json_decode($line, true, 512, JSON_THROW_ON_ERROR);
         } catch (\JsonException $e) {
@@ -312,4 +324,4 @@ class SwowServerTransport implements Transport
     {
         return new self($input, $output);
     }
-} 
+}
