@@ -85,6 +85,7 @@ class ModelPreferences implements McpModel {
             }
         }
         foreach ($this->hints as $hint) {
+            /** @phpstan-ignore-next-line */
             if (!$hint instanceof ModelHint) {
                 throw new \InvalidArgumentException('Hints must be instances of ModelHint');
             }

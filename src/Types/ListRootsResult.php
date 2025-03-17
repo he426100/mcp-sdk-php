@@ -43,6 +43,7 @@ class ListRootsResult extends Result {
     public function validate(): void {
         parent::validate();
         foreach ($this->roots as $root) {
+            /** @phpstan-ignore-next-line */
             if (!$root instanceof Root) {
                 throw new \InvalidArgumentException('Roots must be instances of Root');
             }

@@ -44,6 +44,7 @@ class ListResourceTemplatesResult extends PaginatedResult {
     public function validate(): void {
         parent::validate();
         foreach ($this->resourceTemplates as $template) {
+            /** @phpstan-ignore-next-line */
             if (!$template instanceof ResourceTemplate) {
                 throw new \InvalidArgumentException('Resource templates must be instances of ResourceTemplate');
             }

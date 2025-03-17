@@ -37,8 +37,7 @@ class UnsubscribeRequest extends Request {
 
     public function validate(): void {
         parent::validate();
-        if ($this->params instanceof UnsubscribeRequestParams) {
-            $this->params->validate();
-        }
+        
+        $this->params->validate();
     }
 }

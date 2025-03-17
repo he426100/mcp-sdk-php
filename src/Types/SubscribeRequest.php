@@ -37,8 +37,7 @@ class SubscribeRequest extends Request {
 
     public function validate(): void {
         parent::validate();
-        if ($this->params instanceof SubscribeRequestParams) {
-            $this->params->validate();
-        }
+        
+        $this->params->validate();
     }
 }

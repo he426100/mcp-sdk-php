@@ -32,7 +32,7 @@ namespace Mcp\Types;
 /**
  * A placeholder object for responses that have no meaningful result data.
  */
-class EmptyResult extends Result
+final class EmptyResult extends Result
 {
     /**
      * Construct from server response data.
@@ -66,7 +66,7 @@ class EmptyResult extends Result
      */
     public function validate(): void
     {
-        // For an “empty” result, you might do nothing special or call parent:
+        // For an ï¿½emptyï¿½ result, you might do nothing special or call parent:
         parent::validate();
     }
 }

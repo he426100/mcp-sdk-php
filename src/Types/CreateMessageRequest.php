@@ -54,6 +54,7 @@ class CreateMessageRequest extends Request {
             throw new \InvalidArgumentException('Messages array cannot be empty');
         }
         foreach ($this->messages as $message) {
+            /** @phpstan-ignore-next-line */
             if (!$message instanceof SamplingMessage) {
                 throw new \InvalidArgumentException('Messages must be instances of SamplingMessage');
             }

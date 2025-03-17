@@ -72,6 +72,7 @@ class Prompt implements McpModel {
             throw new \InvalidArgumentException('Prompt name cannot be empty');
         }
         foreach ($this->arguments as $argument) {
+            /** @phpstan-ignore-next-line */
             if (!$argument instanceof PromptArgument) {
                 throw new \InvalidArgumentException('Prompt arguments must be instances of PromptArgument');
             }

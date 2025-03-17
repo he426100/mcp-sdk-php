@@ -69,6 +69,7 @@ class ListToolsResult extends PaginatedResult {
     public function validate(): void {
         parent::validate();
         foreach ($this->tools as $tool) {
+            /** @phpstan-ignore-next-line */
             if (!$tool instanceof Tool) {
                 throw new \InvalidArgumentException('Tools must be instances of Tool');
             }

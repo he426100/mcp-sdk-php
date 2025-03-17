@@ -82,6 +82,7 @@ class GetPromptResult extends Result
     {
         parent::validate();
         foreach ($this->messages as $message) {
+            /** @phpstan-ignore-next-line */
             if (!$message instanceof PromptMessage) {
                 throw new \InvalidArgumentException('Messages must be instances of PromptMessage');
             }

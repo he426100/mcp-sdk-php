@@ -82,6 +82,7 @@ class ReadResourceResult extends Result {
     public function validate(): void {
         parent::validate();
         foreach ($this->contents as $content) {
+            /** @phpstan-ignore-next-line */
             if (!($content instanceof TextResourceContents || $content instanceof BlobResourceContents)) {
                 throw new \InvalidArgumentException('Contents must be TextResourceContents or BlobResourceContents');
             }

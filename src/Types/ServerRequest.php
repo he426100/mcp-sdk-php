@@ -144,7 +144,7 @@ class ServerRequest implements McpModel {
         }
 
         $content = self::createSamplingContent($m['content']);
-        return new SamplingMessage(role: $m['role'], content: $content);
+        return new SamplingMessage(role: Role::from($m['role']), content: $content);
     }
 
     private static function createSamplingContent(array $c): TextContent|ImageContent {

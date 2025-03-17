@@ -37,8 +37,7 @@ class ResourceUpdatedNotification extends Notification {
 
     public function validate(): void {
         parent::validate();
-        if ($this->params instanceof ResourceUpdatedNotificationParams) {
-            $this->params->validate();
-        }
+        
+        $this->params->validate();
     }
 }

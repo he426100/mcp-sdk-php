@@ -94,6 +94,7 @@ class CallToolResult extends Result
     {
         parent::validate();
         foreach ($this->content as $item) {
+            /** @phpstan-ignore-next-line */
             if (!($item instanceof TextContent || $item instanceof ImageContent || $item instanceof EmbeddedResource)) {
                 throw new \InvalidArgumentException('Tool call content must be TextContent, ImageContent, or EmbeddedResource instances');
             }

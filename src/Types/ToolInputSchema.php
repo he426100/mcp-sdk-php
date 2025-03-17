@@ -97,6 +97,7 @@ class ToolInputSchema implements McpModel {
         // type is always "object", we enforce this in the Tool class itself.
         if ($this->required !== null) {
             foreach ($this->required as $r) {
+                /** @phpstan-ignore-next-line */
                 if (!is_string($r) || $r === '') {
                     throw new \InvalidArgumentException('Required field names must be non-empty strings');
                 }

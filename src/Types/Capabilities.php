@@ -44,26 +44,6 @@ abstract class Capabilities implements McpModel {
         public ?ExperimentalCapabilities $experimental = null,
     ) {}
 
-    public static function fromArray(array $data): self {
-        $experimentalData = $data['experimental'] ?? null;
-        unset($data['experimental']);
-
-        $experimental = null;
-        if ($experimentalData !== null && is_array($experimentalData)) {
-            $experimental = ExperimentalCapabilities::fromArray($experimentalData);
-        }
-
-        $obj = new self($experimental);
-
-        // Extra fields
-        foreach ($data as $k => $v) {
-            $obj->$k = $v;
-        }
-
-        $obj->validate();
-        return $obj;
-    }
-
     public function validate(): void {
         if ($this->experimental !== null) {
             $this->experimental->validate();

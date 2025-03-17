@@ -37,8 +37,7 @@ class SetLevelRequest extends Request {
 
     public function validate(): void {
         parent::validate();
-        if ($this->params instanceof SetLevelRequestParams) {
-            $this->params->validate();
-        }
+        
+        $this->params->validate();
     }
 }

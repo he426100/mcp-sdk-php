@@ -81,6 +81,7 @@ class Annotations implements McpModel {
         // audience?: Role[]
         if ($this->audience !== null) {
             foreach ($this->audience as $role) {
+                /** @phpstan-ignore-next-line */
                 if (!($role instanceof Role)) {
                     throw new \InvalidArgumentException('Invalid role in annotations audience');
                 }

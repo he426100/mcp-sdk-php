@@ -37,8 +37,7 @@ class ProgressNotification extends Notification {
 
     public function validate(): void {
         parent::validate();
-        if ($this->params !== null && $this->params instanceof ProgressNotificationParams) {
-            $this->params->validate();
-        }
+        
+        $this->params->validate();
     }
 }

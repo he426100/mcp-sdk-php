@@ -72,6 +72,7 @@ class ListPromptsResult extends PaginatedResult
     {
         parent::validate();
         foreach ($this->prompts as $prompt) {
+            /** @phpstan-ignore-next-line */
             if (!$prompt instanceof Prompt) {
                 throw new \InvalidArgumentException('Prompts must be instances of Prompt');
             }

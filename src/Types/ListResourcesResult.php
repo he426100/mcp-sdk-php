@@ -69,6 +69,7 @@ class ListResourcesResult extends PaginatedResult {
     public function validate(): void {
         parent::validate();
         foreach ($this->resources as $resource) {
+            /** @phpstan-ignore-next-line */
             if (!$resource instanceof Resource) {
                 throw new \InvalidArgumentException('Resources must be instances of Resource');
             }
