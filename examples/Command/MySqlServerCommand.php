@@ -10,6 +10,7 @@ use Examples\Service\LoggerService;
 
 use Mcp\Server\Server;
 use Mcp\Server\ServerRunner;
+use Mcp\Server\SwowRunner;
 use Mcp\Types\Tool;
 use Mcp\Types\CallToolResult;
 use Mcp\Types\ListToolsResult;
@@ -209,7 +210,7 @@ class MySqlServerCommand extends Command
 
         // 创建初始化选项并运行服务器
         $initOptions = $server->createInitializationOptions();
-        $runner = new ServerRunner($server, $initOptions, $logger);
+        $runner = new SwowRunner($server, $initOptions, $logger);
 
         try {
             $output->writeln("<info>启动MySQL工具服务器</info>");
