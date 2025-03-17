@@ -559,8 +559,17 @@ class MySqlServerCommand extends Command
                     throw new \InvalidArgumentException("未知的资源类型: {$type}");
             }
             
+            // 修复：返回符合 MCP 规范的资源内容对象
+            // 每个资源内容对象必须包含 uri、mimeType 和 text/blob 字段
             return new ReadResourceResult(
-                contents: [new TextContent(text: $content)],
+                contents: [
+                    // 使用一个包含所有必需字段的对象，不是 TextContent
+                    [
+                        "uri" => $resourceUri,
+                        "mimeType" => $mimeType,
+                        "text" => $content
+                    ]
+                ],
             );
         } catch (\Exception $e) {
             $logger->error("读取资源失败", ['resourceUri' => $resourceUri, 'exception' => $e->getMessage()]);
