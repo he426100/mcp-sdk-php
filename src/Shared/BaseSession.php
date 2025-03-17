@@ -374,8 +374,9 @@ abstract class BaseSession
      *
      * @param int $requestIdValue The numeric request ID value.
      * @param string $resultType The expected result type.
-     * @param McpModel|null $futureResult A reference that will be set by the response handler closure.
-     * @return McpModel The result object.
+     * @param-out McpModel $futureResult A reference that will be set by the response handler closure.
+     * @param ?McpModel &$futureResult A reference that will be set by the response handler closure.
+     * @return ?McpModel The result object.
      * @throws McpError If an error response is received.
      * @throws InvalidArgumentException If no result is received.
      */
