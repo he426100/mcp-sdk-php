@@ -278,12 +278,9 @@ abstract class BaseSession
             // Validate request
             $request->validate();
 
-            $meta = $innerMessage->params->_meta ? (is_array($innerMessage->params->_meta) ?
-                $innerMessage->params->_meta : $innerMessage->params->_meta->jsonSerialize()) :
-                [];
             $responder = new RequestResponder(
                 requestId: $innerMessage->id,
-                params: $meta,
+                params: $innerMessage->params->_meta ? $innerMessage->params->_meta->jsonSerialize() : [],
                 request: $request,
                 session: $this
             );
