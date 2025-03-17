@@ -4,3 +4,4 @@ composer.lock
 .history/
 runtime/
 .env
+.cursor/
