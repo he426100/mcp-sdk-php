@@ -44,6 +44,14 @@ use Mcp\Types\JSONRPCResponse;
 use Mcp\Types\JSONRPCError;
 use Mcp\Types\JsonRpcErrorObject;
 use Mcp\Types\Result;
+use Mcp\Types\EmptyResult;
+use Mcp\Types\ListToolsResult;
+use Mcp\Types\CallToolResult;
+use Mcp\Types\ListResourcesResult;
+use Mcp\Types\ReadResourceResult;
+use Mcp\Types\ListPromptsResult;
+use Mcp\Types\GetPromptResult;
+use Mcp\Types\ListResourceTemplatesResult;
 use Mcp\Shared\ErrorData;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
@@ -63,6 +71,9 @@ class Server
     /** @var array<string, callable(?array): void> */
     private array $notificationHandlers = [];
     private LoggerInterface $logger;
+    private ToolManager $toolManager;
+    private ResourceManager $resourceManager; 
+    private PromptManager $promptManager;
 
     public function __construct(
         private readonly string $name,
@@ -71,10 +82,79 @@ class Server
         $this->logger = $logger ?? new NullLogger();
         $this->logger->debug("Initializing server '$name'");
 
-        // Register built-in ping handler: returns an EmptyResult as per schema
-        $this->registerHandler('ping', function (?array $params): Result {
-            // Ping returns an EmptyResult according to the schema
-            return new Result();
+        // 初始化管理器
+        $this->toolManager = new ToolManager();
+        $this->resourceManager = new ResourceManager();
+        $this->promptManager = new PromptManager();
+
+        // 注册默认 handlers
+        $this->registerDefaultHandlers();
+    }
+
+    /**
+     * 注册默认的请求处理器
+     */
+    private function registerDefaultHandlers(): void
+    {
+        // 注册内置的 ping handler
+        $this->registerHandler('ping', function (?array $params): EmptyResult {
+            return new EmptyResult();
+        });
+
+        // 工具相关 handlers
+        $this->registerHandler('tools/list', function (?array $params): ListToolsResult {
+            $tools = $this->toolManager->listTools();
+            return new ListToolsResult($tools);
+        });
+
+        $this->registerHandler('tools/call', function (?array $params): CallToolResult {
+            if (!isset($params['name'])) {
+                throw new InvalidArgumentException('Tool name is required');
+            }
+            $name = $params['name'];
+            $arguments = $params['arguments'] ?? [];
+            
+            $result = $this->toolManager->callTool($name, $arguments);
+            return new CallToolResult($result);
+        });
+
+        // 资源相关 handlers
+        $this->registerHandler('resources/list', function (?array $params): ListResourcesResult {
+            $resources = $this->resourceManager->listResources();
+            return new ListResourcesResult($resources);
+        });
+
+        $this->registerHandler('resources/read', function (?array $params): ReadResourceResult {
+            if (!isset($params['uri'])) {
+                throw new InvalidArgumentException('Resource URI is required');
+            }
+            $uri = $params['uri'];
+            
+            $content = $this->resourceManager->readResource($uri);
+            return new ReadResourceResult($content);
+        });
+
+        // 提示相关 handlers
+        $this->registerHandler('prompts/list', function (?array $params): ListPromptsResult {
+            $prompts = $this->promptManager->listPrompts();
+            return new ListPromptsResult($prompts);
+        });
+
+        $this->registerHandler('prompts/get', function (?array $params): GetPromptResult {
+            if (!isset($params['name'])) {
+                throw new InvalidArgumentException('Prompt name is required');
+            }
+            $name = $params['name'];
+            $arguments = $params['arguments'] ?? [];
+            
+            $prompt = $this->promptManager->getPrompt($name, $arguments);
+            return new GetPromptResult($prompt);
+        });
+
+        // 资源模板相关 handlers
+        $this->registerHandler('resources/templates/list', function (?array $params): ListResourceTemplatesResult {
+            $templates = $this->resourceManager->listTemplates();
+            return new ListResourceTemplatesResult($templates);
         });
     }
 
