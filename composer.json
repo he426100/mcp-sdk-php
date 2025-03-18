@@ -14,11 +14,11 @@
         "ext-curl": "*",
         "cboden/ratchet": "^0.4",
         "monolog/monolog": "^3.0",
-        "symfony/console": "^6.4",
-        "swow/swow": "^1.5"
+        "symfony/console": "^6.4"
     },
     "suggest": {
-        "ext-pcntl": "For better process handling in CLI environments"
+        "ext-pcntl": "For better process handling in CLI environments",
+        "swow/swow": "Required to use Swow server"
     },
     "require-dev": {
         "phpunit/phpunit": "^10.0",
