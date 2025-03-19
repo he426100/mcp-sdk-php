@@ -29,20 +29,12 @@ declare(strict_types=1);
 
 namespace Mcp\Server;
 
-use Mcp\Types\JsonRpcMessage;
 use Mcp\Types\ServerCapabilities;
 use Mcp\Types\ServerPromptsCapability;
 use Mcp\Types\ServerResourcesCapability;
 use Mcp\Types\ServerToolsCapability;
 use Mcp\Types\ServerLoggingCapability;
 use Mcp\Types\ExperimentalCapabilities;
-use Mcp\Types\LoggingLevel;
-use Mcp\Types\RequestId;
-use Mcp\Shared\McpError;
-use Mcp\Shared\ErrorData as TypesErrorData;
-use Mcp\Types\JSONRPCResponse;
-use Mcp\Types\JSONRPCError;
-use Mcp\Types\JsonRpcErrorObject;
 use Mcp\Types\Result;
 use Mcp\Types\EmptyResult;
 use Mcp\Types\ListToolsResult;
@@ -52,6 +44,11 @@ use Mcp\Types\ReadResourceResult;
 use Mcp\Types\ListPromptsResult;
 use Mcp\Types\GetPromptResult;
 use Mcp\Types\ListResourceTemplatesResult;
+use Mcp\Types\RequestParams;
+use Mcp\Types\PaginatedRequestParams;
+use Mcp\Types\GetPromptRequestParams;
+use Mcp\Types\ReadResourceRequestParams;
+use Mcp\Types\CallToolRequestParams;
 use Mcp\Shared\ErrorData;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
@@ -97,17 +94,17 @@ class Server
     private function registerDefaultHandlers(): void
     {
         // 注册内置的 ping handler
-        $this->registerHandler('ping', function (?array $params): EmptyResult {
+        $this->registerHandler('ping', function (?RequestParams $params): EmptyResult {
             return new EmptyResult();
         });
 
         // 工具相关 handlers
-        $this->registerHandler('tools/list', function (?array $params): ListToolsResult {
+        $this->registerHandler('tools/list', function (PaginatedRequestParams $params): ListToolsResult {
             $tools = $this->toolManager->listTools();
             return new ListToolsResult($tools);
         });
 
-        $this->registerHandler('tools/call', function (?array $params): CallToolResult {
+        $this->registerHandler('tools/call', function (CallToolRequestParams $params): CallToolResult {
             if (!isset($params['name'])) {
                 throw new InvalidArgumentException('Tool name is required');
             }
@@ -119,12 +116,12 @@ class Server
         });
 
         // 资源相关 handlers
-        $this->registerHandler('resources/list', function (?array $params): ListResourcesResult {
+        $this->registerHandler('resources/list', function (PaginatedRequestParams $params): ListResourcesResult {
             $resources = $this->resourceManager->listResources();
             return new ListResourcesResult($resources);
         });
 
-        $this->registerHandler('resources/read', function (?array $params): ReadResourceResult {
+        $this->registerHandler('resources/read', function (ReadResourceRequestParams $params): ReadResourceResult {
             if (!isset($params['uri'])) {
                 throw new InvalidArgumentException('Resource URI is required');
             }
@@ -135,12 +132,12 @@ class Server
         });
 
         // 提示相关 handlers
-        $this->registerHandler('prompts/list', function (?array $params): ListPromptsResult {
+        $this->registerHandler('prompts/list', function (PaginatedRequestParams $params): ListPromptsResult {
             $prompts = $this->promptManager->listPrompts();
             return new ListPromptsResult($prompts);
         });
 
-        $this->registerHandler('prompts/get', function (?array $params): GetPromptResult {
+        $this->registerHandler('prompts/get', function (GetPromptRequestParams $params): GetPromptResult {
             if (!isset($params['name'])) {
                 throw new InvalidArgumentException('Prompt name is required');
             }
@@ -152,7 +149,7 @@ class Server
         });
 
         // 资源模板相关 handlers
-        $this->registerHandler('resources/templates/list', function (?array $params): ListResourceTemplatesResult {
+        $this->registerHandler('resources/templates/list', function (PaginatedRequestParams $params): ListResourceTemplatesResult {
             $templates = $this->resourceManager->listTemplates();
             return new ListResourceTemplatesResult($templates);
         });
