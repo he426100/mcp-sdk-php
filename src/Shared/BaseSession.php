@@ -85,6 +85,7 @@ abstract class BaseSession
             throw new RuntimeException('Session already initialized');
         }
         $this->isInitialized = true;
+        $this->startMessageProcessing();
     }
 
     /**
@@ -104,6 +105,7 @@ abstract class BaseSession
             return;
         }
         $this->isInitialized = false;
+        $this->stopMessageProcessing();
     }
 
     /**
@@ -393,6 +395,16 @@ abstract class BaseSession
         return $futureResult;
     }
 
+    /**
+     * Starts message processing. For a synchronous model, this might be a no-op or set up resources.
+     */
+    abstract protected function startMessageProcessing(): void;
+
+    /**
+     * Stops message processing. For synchronous model, may close streams or sockets.
+     */
+    abstract protected function stopMessageProcessing(): void;
+    
     /**
      * Reads the next message from the underlying transport.
      * This must be implemented by subclasses and should block until a message is available.

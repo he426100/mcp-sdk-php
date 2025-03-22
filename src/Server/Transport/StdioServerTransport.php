@@ -46,6 +46,8 @@ use InvalidArgumentException;
 use Swow\Buffer;
 use Swow\Channel;
 use Swow\Socket;
+use Swow\Coroutine;
+use Swow\Sync\WaitReference;
 use Swow\Stream\EofStream;
 
 /**
@@ -60,8 +62,7 @@ class StdioServerTransport implements Transport
     private EofStream $input;
     /** @var EofStream 输出流 */
     private EofStream $output;
-    /** @var array<string> */
-    private array $writeBuffer = [];
+
     /** @var bool 是否已启动 */
     private bool $isStarted = false;
 
@@ -82,7 +83,7 @@ class StdioServerTransport implements Transport
         $this->output = $output ?? new EofStream("\n", Socket::TYPE_STDOUT);
     }
 
-    public function getStreams()
+    public function getStreams(): array
     {
         return [$this->read, $this->write];
     }
@@ -110,7 +111,6 @@ class StdioServerTransport implements Transport
             return;
         }
 
-        $this->flush();
         $this->isStarted = false;
     }
 
@@ -134,7 +134,7 @@ class StdioServerTransport implements Transport
      * @throws RuntimeException If the transport is not started.
      * @throws McpError          If a JSON-RPC error occurs during parsing or validation.
      */
-    public function readMessage(): ?JsonRpcMessage
+    protected function readMessage(): ?JsonRpcMessage
     {
         if (!$this->isStarted) {
             throw new RuntimeException('Transport not started');
@@ -282,7 +282,7 @@ class StdioServerTransport implements Transport
      *
      * @throws RuntimeException If the transport is not started or if writing fails.
      */
-    public function writeMessage(JsonRpcMessage $message): void
+    protected function writeMessage(JsonRpcMessage $message): void
     {
         if (!$this->isStarted) {
             throw new RuntimeException('Transport not started');
@@ -294,36 +294,29 @@ class StdioServerTransport implements Transport
             throw new RuntimeException('Failed to encode message as JSON: ' . json_last_error_msg());
         }
 
-        // Append newline as per JSON-RPC over STDIO specification
-        $json .= "\n";
-
-        // Buffer the message
-        $this->writeBuffer[] = $json;
-
-        // Attempt to flush immediately for non-blocking behavior
-        $this->flush();
+        try {
+            $this->output->sendMessage($json);
+        } catch (\Exception $e) {
+            throw new RuntimeException('Failed to write to stdout: ' . $e->getMessage());
+        }
     }
 
-    /**
-     * Flushes the write buffer by sending all buffered messages to STDOUT.
-     *
-     * @throws RuntimeException If writing to STDOUT fails.
-     */
-    public function flush(): void
+    public function run()
     {
-        if (!$this->isStarted) {
-            return;
-        }
-
-        while (!empty($this->writeBuffer)) {
-            $data = array_shift($this->writeBuffer);
-
-            try {
-                $this->output->sendMessage($data);
-            } catch (\Exception $e) {
-                throw new RuntimeException('Failed to write to stdout: ' . $e->getMessage());
+        $wr = new WaitReference();
+        Coroutine::run(function () use ($wr): void {
+            while($this->isStarted) {
+                $message = $this->readMessage();
+                $this->read->push($message);
             }
-        }
+        });
+        Coroutine::run(function () use ($wr): void {
+            while($this->isStarted) {
+                $message = $this->write->pop();
+                $this->writeMessage($message);
+            }
+        });
+        WaitReference::wait($wr);
     }
 
     /**

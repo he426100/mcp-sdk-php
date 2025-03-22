@@ -65,35 +65,29 @@ class ServerRunner
         $wr = new WaitReference();
         try {
             $transport = StdioServerTransport::create();
-            list($read, $write) = $transport->getStreams();
-
-            $session = new ServerSession(
-                $read,
-                $write,
-                $initOptions,
-                $this->logger
-            );
-
-            // Add handlers
-            $session->registerHandlers($server->getHandlers());
-            $session->registerNotificationHandlers($server->getNotificationHandlers());
-
             $transport->start();
-            $session->start();
+
+            Coroutine::run(function () use ($wr, $transport): void {
+                $transport->run();
+            });
+
+            Coroutine::run(function () use ($wr, $transport, $server, $initOptions): void {
+                list($read, $write) = $transport->getStreams();
+
+                $session = new ServerSession(
+                    $read,
+                    $write,
+                    $initOptions,
+                    $this->logger
+                );
+
+                // Add handlers
+                $session->registerHandlers($server->getHandlers());
+                $session->registerNotificationHandlers($server->getNotificationHandlers());
+                $session->start();
+            });
+            
             $this->logger->info('Server started');
-
-            Coroutine::run(static function () use ($wr, $transport): void {
-                while(1) {
-                    $transport->readMessage();
-                }
-            });
-
-            Coroutine::run(static function () use ($wr, $read, $session): void {
-                while (1) {
-                    $message = $read->pop();
-                    $session->handleIncomingMessage($message);
-                }
-            });
         } catch (\Exception $e) {
             $this->logger->error('Server error: ' . $e->getMessage());
             throw $e;

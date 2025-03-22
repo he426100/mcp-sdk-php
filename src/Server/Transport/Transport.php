@@ -28,8 +28,6 @@ declare(strict_types=1);
 
 namespace Mcp\Server\Transport;
 
-use Mcp\Types\JsonRpcMessage;
-
 /**
  * Base interface for MCP transport implementations
  */
@@ -48,18 +46,8 @@ interface Transport
     public function stop(): void;
 
     /**
-     * Read the next message from the transport
      * 
-     * @return JsonRpcMessage|null Returns null when no message is available
-     * @throws \Exception if an error occurs while reading
+     * @return array 
      */
-    public function readMessage(): ?JsonRpcMessage;
-
-    /**
-     * Write a message to the transport
-     * 
-     * @param JsonRpcMessage $message The message to write
-     * @throws \Exception if an error occurs while writing
-     */
-    public function writeMessage(JsonRpcMessage $message): void;
+    public function getStreams(): array;   
 }

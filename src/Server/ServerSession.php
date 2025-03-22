@@ -383,6 +383,25 @@ class ServerSession extends BaseSession
         $this->writeMessage($notification);
     }
 
+    /**
+     * Implementing abstract methods from BaseSession
+     */
+
+     protected function startMessageProcessing(): void
+     {
+         // Start reading messages from the transport
+         // This could be a loop or a separate thread in a real implementation
+         // For demonstration, we'll use a simple loop
+         while ($this->isInitialized) {
+             $message = $this->readNextMessage();
+             $this->handleIncomingMessage($message);
+         }
+     }
+ 
+     protected function stopMessageProcessing(): void
+     {
+     }
+     
     protected function writeMessage(JsonRpcMessage $message): void
     {
         $this->logger->debug('writeMessage: ' . json_encode($message));
