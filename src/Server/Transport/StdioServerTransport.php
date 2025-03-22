@@ -41,48 +41,41 @@ use Mcp\Types\JSONRPCError;
 use Mcp\Types\RequestParams;
 use Mcp\Types\NotificationParams;
 use Mcp\Types\Result;
-use Mcp\Types\Meta;
 use RuntimeException;
 use InvalidArgumentException;
+use Swow\Buffer;
+use Swow\Socket;
+use Swow\Stream\EofStream;
 
 /**
  * Class StdioServerTransport
  *
  * STDIO-based transport implementation for MCP servers.
- * Handles reading from STDIN and writing to STDOUT using JSON-RPC 2.0 protocol.
+ * Uses Swow's EofStream to handle JSON-RPC messages over STDIO.
  */
 class StdioServerTransport implements Transport
 {
-    /** @var resource */
-    private $stdin;
-    /** @var resource */
-    private $stdout;
+    /** @var EofStream 输入流 */
+    private EofStream $input;
+    /** @var EofStream 输出流 */
+    private EofStream $output;
     /** @var array<string> */
     private array $writeBuffer = [];
-    /** @var bool */
+    /** @var bool 是否已启动 */
     private bool $isStarted = false;
 
     /**
-     * StdioServerTransport constructor.
-     *
-     * @param resource|null $stdin  Input stream (defaults to STDIN)
-     * @param resource|null $stdout Output stream (defaults to STDOUT)
-     *
-     * @throws InvalidArgumentException If provided streams are not valid resources.
+     * StdinServerTransport 构造函数
+     * 
+     * @param EofStream|null $input 输入流（默认为标准输入）
+     * @param EofStream|null $output 输出流（默认为标准输出）
      */
     public function __construct(
-        $stdin = null,
-        $stdout = null
+        ?EofStream $input = null,
+        ?EofStream $output = null
     ) {
-        if ($stdin !== null && !is_resource($stdin)) {
-            throw new InvalidArgumentException('stdin must be a valid resource.');
-        }
-        if ($stdout !== null && !is_resource($stdout)) {
-            throw new InvalidArgumentException('stdout must be a valid resource.');
-        }
-
-        $this->stdin = $stdin ?? STDIN;
-        $this->stdout = $stdout ?? STDOUT;
+        $this->input = $input ?? (new EofStream("\n", type: Socket::TYPE_STDIN))->setReadTimeout(-1);
+        $this->output = $output ?? new EofStream("\n", Socket::TYPE_STDOUT);
     }
 
     /**
@@ -94,19 +87,6 @@ class StdioServerTransport implements Transport
     {
         if ($this->isStarted) {
             throw new RuntimeException('Transport already started');
-        }
-
-        // Determine the operating system
-        $os = PHP_OS_FAMILY;
-
-        // Set streams to non-blocking mode if not on Windows
-        if ($os !== 'Windows') {
-            if (!stream_set_blocking($this->stdin, false)) {
-                throw new RuntimeException('Failed to set stdin to non-blocking mode');
-            }
-            if (!stream_set_blocking($this->stdout, false)) {
-                throw new RuntimeException('Failed to set stdout to non-blocking mode');
-            }
         }
 
         $this->isStarted = true;
@@ -132,10 +112,9 @@ class StdioServerTransport implements Transport
      */
     public function hasDataAvailable(): bool
     {
-        $read = [$this->stdin];
-        $write = $except = [];
-        // Timeout of 0 for non-blocking check
-        return stream_select($read, $write, $except, 0) > 0;
+        $buffer = new Buffer(1);
+        $bytesRead = $this->input->peek($buffer, 0, 1, 0);
+        return $bytesRead > 0;
     }
 
     /**
@@ -153,10 +132,7 @@ class StdioServerTransport implements Transport
         }
 
         // Attempt to read a line from STDIN
-        $line = fgets($this->stdin);
-        if ($line === false) {
-            return null; // No data available
-        }
+        $line = $this->input->recvMessageString();
 
         try {
             // Decode JSON with strict error handling
@@ -332,33 +308,24 @@ class StdioServerTransport implements Transport
 
         while (!empty($this->writeBuffer)) {
             $data = array_shift($this->writeBuffer);
-            $written = fwrite($this->stdout, $data);
 
-            if ($written === false) {
-                throw new RuntimeException('Failed to write to stdout');
-            }
-
-            // Handle partial writes by re-buffering the unwritten part
-            if ($written < strlen($data)) {
-                $this->writeBuffer = [substr($data, $written), ...$this->writeBuffer];
-                break;
+            try {
+                $this->output->sendMessage($data);
+            } catch (\Exception $e) {
+                throw new RuntimeException('Failed to write to stdout: ' . $e->getMessage());
             }
         }
-
-        // Ensure all buffered data is sent
-        fflush($this->stdout);
     }
 
     /**
-     * Creates a new instance of StdioServerTransport with default STDIN and STDOUT.
+     * 创建 StdinServerTransport 的新实例
      *
-     * @param resource|null $stdin  Input stream (defaults to STDIN)
-     * @param resource|null $stdout Output stream (defaults to STDOUT)
-     *
+     * @param EofStream|null $input 输入流
+     * @param EofStream|null $output 输出流
      * @return self
      */
-    public static function create($stdin = null, $stdout = null): self
+    public static function create(?EofStream $input = null, ?EofStream $output = null): self
     {
-        return new self($stdin, $stdout);
+        return new self($input, $output);
     }
 }
