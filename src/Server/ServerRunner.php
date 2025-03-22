@@ -46,22 +46,14 @@ use RuntimeException;
  */
 class ServerRunner
 {
-    private LoggerInterface $logger;
-
-    public function __construct(
-        private readonly Server $server,
-        private readonly InitializationOptions $initOptions,
-        ?LoggerInterface $logger = null
-    ) {
-        $this->logger = $logger ?? $this->createDefaultLogger();
-    }
+    public function __construct(private ?LoggerInterface $logger = null) {}
 
     /**
      * Run the server using STDIO transport.
      *
      * This sets up a ServerSession with a StdioServerTransport and enters a loop to read messages.
      */
-    public function run(): void
+    public function run(Server $server, InitializationOptions $initOptions,): void
     {
         // Suppress warnings unless explicitly enabled (similar to Python code ignoring warnings)
         if (!getenv('MCP_ENABLE_WARNINGS')) {
@@ -73,13 +65,13 @@ class ServerRunner
 
             $session = new ServerSession(
                 $transport,
-                $this->initOptions,
+                $initOptions,
                 $this->logger
             );
 
             // Add handlers
-            $session->registerHandlers($this->server->getHandlers());
-            $session->registerNotificationHandlers($this->server->getNotificationHandlers());
+            $session->registerHandlers($server->getHandlers());
+            $session->registerNotificationHandlers($server->getNotificationHandlers());
 
             $session->start();
 
@@ -95,74 +87,5 @@ class ServerRunner
                 $transport->stop();
             }
         }
-    }
-
-    /**
-     * Creates a default PSR logger if none provided
-     */
-    private function createDefaultLogger(): LoggerInterface
-    {
-        return new class implements LoggerInterface {
-            public function emergency($message, array $context = []): void
-            {
-                $this->log(LogLevel::EMERGENCY, $message, $context);
-            }
-
-            public function alert($message, array $context = []): void
-            {
-                $this->log(LogLevel::ALERT, $message, $context);
-            }
-
-            public function critical($message, array $context = []): void
-            {
-                $this->log(LogLevel::CRITICAL, $message, $context);
-            }
-
-            public function error($message, array $context = []): void
-            {
-                $this->log(LogLevel::ERROR, $message, $context);
-            }
-
-            public function warning($message, array $context = []): void
-            {
-                $this->log(LogLevel::WARNING, $message, $context);
-            }
-
-            public function notice($message, array $context = []): void
-            {
-                $this->log(LogLevel::NOTICE, $message, $context);
-            }
-
-            public function info($message, array $context = []): void
-            {
-                $this->log(LogLevel::INFO, $message, $context);
-            }
-
-            public function debug($message, array $context = []): void
-            {
-                $this->log(LogLevel::DEBUG, $message, $context);
-            }
-
-            public function log($level, $message, array $context = []): void
-            {
-                $timestamp = date('Y-m-d H:i:s');
-                fprintf(
-                    STDERR,
-                    "[%s] %s: %s\n",
-                    $timestamp,
-                    strtoupper($level),
-                    $this->interpolate($message, $context)
-                );
-            }
-
-            private function interpolate($message, array $context = []): string
-            {
-                $replace = [];
-                foreach ($context as $key => $val) {
-                    $replace['{' . $key . '}'] = $val;
-                }
-                return strtr($message, $replace);
-            }
-        };
     }
 }
