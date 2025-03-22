@@ -43,13 +43,13 @@ use Mcp\Types\InitializeRequestParams;
 use Mcp\Types\Result;
 use Mcp\Server\InitializationState;
 use Mcp\Server\InitializationOptions;
-use Mcp\Server\Transport\Transport;
 use Mcp\Types\JSONRPCResponse;
 use Mcp\Types\JSONRPCError;
 use Mcp\Types\JSONRPCNotification;
 use Mcp\Types\NotificationParams;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
+use Swow\Channel;
 use RuntimeException;
 use InvalidArgumentException;
 
@@ -71,7 +71,8 @@ class ServerSession extends BaseSession
     private array $notificationMethodHandlers = [];
 
     public function __construct(
-        private readonly Transport $transport,
+        private readonly Channel $read,
+        private readonly Channel $write,
         private readonly InitializationOptions $initOptions,
         ?LoggerInterface $logger = null
     ) {
@@ -96,7 +97,6 @@ class ServerSession extends BaseSession
             throw new RuntimeException('Session already initialized');
         }
 
-        $this->transport->start();
         $this->initialize();
     }
 
@@ -109,7 +109,6 @@ class ServerSession extends BaseSession
             return;
         }
 
-        $this->transport->stop();
         $this->close();
     }
 
@@ -384,29 +383,10 @@ class ServerSession extends BaseSession
         $this->writeMessage($notification);
     }
 
-    /**
-     * Implementing abstract methods from BaseSession
-     */
-
-    protected function startMessageProcessing(): void
-    {
-        // Start reading messages from the transport
-        // This could be a loop or a separate thread in a real implementation
-        // For demonstration, we'll use a simple loop
-        while ($this->isInitialized) {
-            $message = $this->readNextMessage();
-            $this->handleIncomingMessage($message);
-        }
-    }
-
-    protected function stopMessageProcessing(): void
-    {
-    }
-
     protected function writeMessage(JsonRpcMessage $message): void
     {
         $this->logger->debug('writeMessage: ' . json_encode($message));
-        $this->transport->writeMessage($message);
+        $this->write->push($message);
     }
 
     protected function waitForResponse(int $requestIdValue, string $resultType, ?\Mcp\Types\McpModel &$futureResult): \Mcp\Types\McpModel
@@ -417,14 +397,8 @@ class ServerSession extends BaseSession
 
     protected function readNextMessage(): JsonRpcMessage
     {
-        while (true) {
-            $message = $this->transport->readMessage();
-            if ($message !== null) {
-                $this->logger->debug('readNextMessage: ' . json_encode($message));
-                return $message;
-            }
-            // Sleep briefly to avoid busy-waiting when no messages are available
-            usleep(10000);
-        }
+        $message = $this->read->pop();
+        $this->logger->debug('readNextMessage: ' . json_encode($message));
+        return $message;
     }
 }

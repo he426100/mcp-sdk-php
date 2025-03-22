@@ -85,7 +85,6 @@ abstract class BaseSession
             throw new RuntimeException('Session already initialized');
         }
         $this->isInitialized = true;
-        $this->startMessageProcessing();
     }
 
     /**
@@ -104,7 +103,6 @@ abstract class BaseSession
         if (!$this->isInitialized) {
             return;
         }
-        $this->stopMessageProcessing();
         $this->isInitialized = false;
     }
 
@@ -265,7 +263,7 @@ abstract class BaseSession
      * Handles an incoming message. Called by the subclass that implements message processing.
      * @param JsonRpcMessage $message The incoming message.
      */
-    protected function handleIncomingMessage(JsonRpcMessage $message): void
+    public function handleIncomingMessage(JsonRpcMessage $message): void
     {
         $this->validateMessage($message);
 
@@ -401,15 +399,6 @@ abstract class BaseSession
      */
     abstract protected function readNextMessage(): JsonRpcMessage;
 
-    /**
-     * Starts message processing. For a synchronous model, this might be a no-op or set up resources.
-     */
-    abstract protected function startMessageProcessing(): void;
-
-    /**
-     * Stops message processing. For synchronous model, may close streams or sockets.
-     */
-    abstract protected function stopMessageProcessing(): void;
 
     /**
      * Writes a JsonRpcMessage to the underlying transport.

@@ -44,6 +44,7 @@ use Mcp\Types\Result;
 use RuntimeException;
 use InvalidArgumentException;
 use Swow\Buffer;
+use Swow\Channel;
 use Swow\Socket;
 use Swow\Stream\EofStream;
 
@@ -64,6 +65,9 @@ class StdioServerTransport implements Transport
     /** @var bool 是否已启动 */
     private bool $isStarted = false;
 
+    private Channel $read;
+    private Channel $write;
+
     /**
      * StdinServerTransport 构造函数
      * 
@@ -76,6 +80,11 @@ class StdioServerTransport implements Transport
     ) {
         $this->input = $input ?? (new EofStream("\n", type: Socket::TYPE_STDIN))->setReadTimeout(-1);
         $this->output = $output ?? new EofStream("\n", Socket::TYPE_STDOUT);
+    }
+
+    public function getStreams()
+    {
+        return [$this->read, $this->write];
     }
 
     /**
