@@ -17,8 +17,7 @@
         "symfony/console": "^6.4"
     },
     "suggest": {
-        "ext-pcntl": "For better process handling in CLI environments",
-        "swow/swow": "Required to use Swow server"
+        "ext-pcntl": "For better process handling in CLI environments"
     },
     "require-dev": {
         "phpunit/phpunit": "^10.0",
