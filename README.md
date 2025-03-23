@@ -109,8 +109,8 @@ $server->registerHandler('prompts/get', function(GetPromptRequestParams $params)
 
 // Create initialization options and run server
 $initOptions = $server->createInitializationOptions();
-$runner = new ServerRunner($server, $initOptions);
-$runner->run();
+$runner = new ServerRunner();
+$runner->run($server, $initOptions);
 ```
 
 Save this as `example_server.php`

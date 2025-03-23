@@ -69,22 +69,19 @@ class ServerRunner
             $transport = StdioServerTransport::create();
             $transport->start();
 
-            Coroutine::run(function () use ($transport, $server, $initOptions): void {
-                list($read, $write) = $transport->getStreams();
+            list($read, $write) = $transport->getStreams();
+            $session = new ServerSession(
+                $read,
+                $write,
+                $initOptions,
+                $this->logger
+            );
 
-                $session = new ServerSession(
-                    $read,
-                    $write,
-                    $initOptions,
-                    $this->logger
-                );
+            // Add handlers
+            $session->registerHandlers($server->getHandlers());
+            $session->registerNotificationHandlers($server->getNotificationHandlers());
+            $session->start();
 
-                // Add handlers
-                $session->registerHandlers($server->getHandlers());
-                $session->registerNotificationHandlers($server->getNotificationHandlers());
-                $session->start();
-            });
-            
             $this->logger->info('Server started');
             waitAll();
         } catch (\Exception $e) {

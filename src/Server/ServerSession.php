@@ -50,6 +50,7 @@ use Mcp\Types\NotificationParams;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Swow\Channel;
+use Swow\Coroutine;
 use RuntimeException;
 use InvalidArgumentException;
 
@@ -392,10 +393,12 @@ class ServerSession extends BaseSession
         // Start reading messages from the transport
         // This could be a loop or a separate thread in a real implementation
         // For demonstration, we'll use a simple loop
-        while ($this->isInitialized) {
-            $message = $this->readNextMessage();
-            $this->handleIncomingMessage($message);
-        }
+        Coroutine::run(function (): void {
+            while ($this->isInitialized) {
+                $message = $this->readNextMessage();
+                $this->handleIncomingMessage($message);
+            } 
+        });
     }
 
     protected function stopMessageProcessing(): void {}
