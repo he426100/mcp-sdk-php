@@ -37,7 +37,8 @@ use Mcp\Types\ServerCapabilities;
 use Psr\Log\LoggerInterface;
 use Psr\Log\LogLevel;
 use Swow\Coroutine;
-use Swow\Sync\WaitReference;
+use function Swow\Sync\waitAll;
+use Swow\WatchDog;
 use RuntimeException;
 
 /**
@@ -62,16 +63,13 @@ class ServerRunner
             error_reporting(E_ERROR | E_PARSE);
         }
 
-        $wr = new WaitReference();
+        WatchDog::run();
+
         try {
             $transport = StdioServerTransport::create();
             $transport->start();
 
-            Coroutine::run(function () use ($wr, $transport): void {
-                $transport->run();
-            });
-
-            Coroutine::run(function () use ($wr, $transport, $server, $initOptions): void {
+            Coroutine::run(function () use ($transport, $server, $initOptions): void {
                 list($read, $write) = $transport->getStreams();
 
                 $session = new ServerSession(
@@ -88,6 +86,7 @@ class ServerRunner
             });
             
             $this->logger->info('Server started');
+            waitAll();
         } catch (\Exception $e) {
             $this->logger->error('Server error: ' . $e->getMessage());
             throw $e;
@@ -99,6 +98,5 @@ class ServerRunner
                 $transport->stop();
             }
         }
-        WaitReference::wait($wr);
     }
 }

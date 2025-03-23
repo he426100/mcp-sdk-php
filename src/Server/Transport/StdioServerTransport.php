@@ -103,6 +103,7 @@ class StdioServerTransport implements Transport
         }
 
         $this->isStarted = true;
+        $this->run();
     }
 
     /**
@@ -304,22 +305,32 @@ class StdioServerTransport implements Transport
         }
     }
 
-    public function run()
+    protected function run()
     {
-        $wr = new WaitReference();
-        Coroutine::run(function () use ($wr): void {
+        Coroutine::run(function (): void {
             while ($this->isStarted) {
-                $message = $this->readMessage();
-                $this->read->push($message);
+                try {
+                    $message = $this->readMessage();
+                    if ($message !== null) {
+                        $this->read->push($message);
+                    }
+                } catch (\Throwable $e) {
+                    // 协程错误记录
+                    error_log("读取协程错误: " . $e->getMessage());
+                }
             }
         });
-        Coroutine::run(function () use ($wr): void {
+        Coroutine::run(function (): void {
             while ($this->isStarted) {
-                $message = $this->write->pop();
-                $this->writeMessage($message);
+                try {
+                    $message = $this->write->pop();
+                    $this->writeMessage($message);
+                } catch (\Throwable $e) {
+                    // 协程错误记录
+                    error_log("写入协程错误: " . $e->getMessage());
+                }
             }
         });
-        WaitReference::wait($wr);
     }
 
     /**
