@@ -81,6 +81,9 @@ class StdioServerTransport implements Transport
     ) {
         $this->input = $input ?? (new EofStream("\n", type: Socket::TYPE_STDIN))->setReadTimeout(-1);
         $this->output = $output ?? new EofStream("\n", Socket::TYPE_STDOUT);
+
+        $this->read = new Channel();
+        $this->write = new Channel();
     }
 
     public function getStreams(): array
@@ -305,13 +308,13 @@ class StdioServerTransport implements Transport
     {
         $wr = new WaitReference();
         Coroutine::run(function () use ($wr): void {
-            while($this->isStarted) {
+            while ($this->isStarted) {
                 $message = $this->readMessage();
                 $this->read->push($message);
             }
         });
         Coroutine::run(function () use ($wr): void {
-            while($this->isStarted) {
+            while ($this->isStarted) {
                 $message = $this->write->pop();
                 $this->writeMessage($message);
             }

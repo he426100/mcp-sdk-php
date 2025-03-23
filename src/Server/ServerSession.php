@@ -142,7 +142,7 @@ class ServerSession extends BaseSession
             if ($clientCaps->experimental === null) {
                 return false;
             }
-            
+
             $expProps = get_object_vars($capability->experimental);
             foreach ($expProps as $key => $value) {
                 if (
@@ -371,7 +371,7 @@ class ServerSession extends BaseSession
     private function writeNotification(string $method, ?array $params = null): void
     {
         $notificationParams = $params !== null ? NotificationParams::fromArray($params) : null;
-        
+
         $jsonRpcNotification = new JSONRPCNotification(
             jsonrpc: '2.0',
             method: $method,
@@ -387,21 +387,19 @@ class ServerSession extends BaseSession
      * Implementing abstract methods from BaseSession
      */
 
-     protected function startMessageProcessing(): void
-     {
-         // Start reading messages from the transport
-         // This could be a loop or a separate thread in a real implementation
-         // For demonstration, we'll use a simple loop
-         while ($this->isInitialized) {
-             $message = $this->readNextMessage();
-             $this->handleIncomingMessage($message);
-         }
-     }
- 
-     protected function stopMessageProcessing(): void
-     {
-     }
-     
+    protected function startMessageProcessing(): void
+    {
+        // Start reading messages from the transport
+        // This could be a loop or a separate thread in a real implementation
+        // For demonstration, we'll use a simple loop
+        while ($this->isInitialized) {
+            $message = $this->readNextMessage();
+            $this->handleIncomingMessage($message);
+        }
+    }
+
+    protected function stopMessageProcessing(): void {}
+
     protected function writeMessage(JsonRpcMessage $message): void
     {
         $this->logger->debug('writeMessage: ' . json_encode($message));
