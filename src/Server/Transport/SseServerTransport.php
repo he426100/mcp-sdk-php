@@ -104,8 +104,7 @@ class SseServerTransport implements Transport
     /**
      * Starts the SSE transport.
      *
-     * @throws RuntimeException If the transport is already started or if no session is attached.
-     *
+     * @throws RuntimeException If the transport is already started.
      * @return void
      */
     public function start(): void
@@ -115,7 +114,6 @@ class SseServerTransport implements Transport
         }
 
         $this->isStarted = true;
-        $this->run();
         $this->logger->debug('SSE transport started');
     }
 
@@ -444,15 +442,11 @@ class SseServerTransport implements Transport
         }
     }
 
-    protected function run()
+    /**
+     * 检查传输层是否已启动
+     */
+    public function isStarted(): bool
     {
-        Coroutine::run(function (): void {
-            while ($this->isStarted) {
-                $message = $this->write->pop();
-                if ($message !== null) {
-                    $this->writeMessage($message);
-                }
-            }
-        });
+        return $this->isStarted;
     }
 }

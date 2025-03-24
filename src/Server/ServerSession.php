@@ -70,6 +70,7 @@ class ServerSession extends BaseSession
     private array $methodHandlers = [];
     /** @var callable[] */
     private array $notificationMethodHandlers = [];
+    private bool $isStarted = false;
 
     public function __construct(
         private readonly Channel $read,
@@ -99,18 +100,7 @@ class ServerSession extends BaseSession
         }
 
         $this->initialize();
-    }
-
-    /**
-     * Stops the server session.
-     */
-    public function stop(): void
-    {
-        if (!$this->isInitialized) {
-            return;
-        }
-
-        $this->close();
+        $this->isStarted = true;
     }
 
     /**
@@ -420,5 +410,44 @@ class ServerSession extends BaseSession
         $message = $this->read->pop();
         $this->logger->debug('readNextMessage: ' . json_encode($message));
         return $message;
+    }
+
+    /**
+     * Check if the session is started.
+     */
+    public function isStarted(): bool
+    {
+        return $this->isStarted;
+    }
+
+    /**
+     * Process the next message in the session.
+     */
+    public function processNextMessage(): void
+    {
+        if (!$this->isStarted) {
+            throw new RuntimeException('Session not started');
+        }
+        
+        try {
+            $message = $this->readNextMessage();
+            $this->handleIncomingMessage($message);
+        } catch (\Exception $e) {
+            // 处理异常
+            throw new RuntimeException('Error processing message: ' . $e->getMessage(), 0, $e);
+        }
+    }
+
+    /**
+     * Stops the server session.
+     */
+    public function stop(): void
+    {
+        if (!$this->isStarted) {
+            return;
+        }
+
+        $this->close();
+        $this->isStarted = false;
     }
 }

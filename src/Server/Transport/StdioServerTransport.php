@@ -103,7 +103,6 @@ class StdioServerTransport implements Transport
         }
 
         $this->isStarted = true;
-        $this->run();
     }
 
     /**
@@ -138,16 +137,21 @@ class StdioServerTransport implements Transport
      * @throws RuntimeException If the transport is not started.
      * @throws McpError          If a JSON-RPC error occurs during parsing or validation.
      */
-    protected function readMessage(): ?JsonRpcMessage
+    public function readMessage(): ?JsonRpcMessage
     {
         if (!$this->isStarted) {
             throw new RuntimeException('Transport not started');
         }
 
-        // Attempt to read a line from STDIN
-        $line = $this->input->recvMessageString();
+        // 检查是否有数据可读
+        if (!$this->hasDataAvailable()) {
+            return null;
+        }
 
         try {
+            // 从输入流读取消息并返回
+            $line = $this->input->recvMessageString();
+
             // Decode JSON with strict error handling
             $data = json_decode($line, true, 512, JSON_THROW_ON_ERROR);
         } catch (\JsonException $e) {
@@ -270,12 +274,7 @@ class StdioServerTransport implements Transport
             throw $e;
         } catch (\Exception $e) {
             // Other exceptions become parse errors
-            throw new McpError(
-                new TypesErrorData(
-                    code: -32700,
-                    message: 'Parse error: ' . $e->getMessage()
-                )
-            );
+            throw new RuntimeException('Error reading message: ' . $e->getMessage(), 0, $e);
         }
     }
 
@@ -286,7 +285,7 @@ class StdioServerTransport implements Transport
      *
      * @throws RuntimeException If the transport is not started or if writing fails.
      */
-    protected function writeMessage(JsonRpcMessage $message): void
+    public function writeMessage(JsonRpcMessage $message): void
     {
         if (!$this->isStarted) {
             throw new RuntimeException('Transport not started');
@@ -305,24 +304,14 @@ class StdioServerTransport implements Transport
         }
     }
 
-    protected function run()
+    /**
+     * Checks if the transport is started.
+     *
+     * @return bool True if the transport is started, false otherwise.
+     */
+    public function isStarted(): bool
     {
-        Coroutine::run(function (): void {
-            while ($this->isStarted) {
-                $message = $this->readMessage();
-                if ($message !== null) {
-                    $this->read->push($message);
-                }
-            }
-        });
-        Coroutine::run(function (): void {
-            while ($this->isStarted) {
-                $message = $this->write->pop();
-                if ($message !== null) {
-                    $this->writeMessage($message);
-                }
-            }
-        });
+        return $this->isStarted;
     }
 
     /**
