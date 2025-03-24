@@ -132,7 +132,7 @@ class SseServerTransport implements Transport
 
         // Close all SSE connections
         foreach ($this->sessions as $sessionId => $session) {
-            fclose($session['output']);
+            $session['output']->close();
             $this->logger->debug("Closed SSE connection: $sessionId");
         }
 
@@ -431,7 +431,7 @@ class SseServerTransport implements Transport
         $now = time();
         foreach ($this->sessions as $sessionId => $session) {
             if ($now - $session['lastSeen'] > $maxAge) {
-                fclose($session['output']);
+                $session['output']->close();
                 unset($this->sessions[$sessionId]);
                 $this->logger->debug("Cleaned up expired session: $sessionId");
             }
