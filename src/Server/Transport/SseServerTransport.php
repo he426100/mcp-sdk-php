@@ -414,7 +414,13 @@ class SseServerTransport implements Transport
 
         $sseData = "event: {$event}\ndata: {$data}\n\n";
 
-        $output->send($sseData);
+        try {
+            $output->send($sseData);
+        } catch (\Exception $e) {
+            $this->logger->error("Failed to write SSE event to session: $sessionId");
+            unset($this->sessions[$sessionId]);
+            return;
+        }
 
         $this->logger->debug("Sent SSE event '{$event}' to session: $sessionId");
     }

@@ -101,9 +101,11 @@ class ServerRunner
                     if ($uri == '/sse') {
                         $transport->handleSseRequest($connection);
                     } elseif ($uri == '/messages') {
-                        $sessionId = $request->getQueryParams()['session_id'];
+                        $sessionId = (string)$request->getQueryParams()['session_id'];
                         $transport->handlePostRequest($sessionId, (string)$request->getBody());
                     }
+                })->withExceptionHandler(function (ServerConnection $connection, \Exception $e) {
+                    $this->logger->error('sse server: ' . $e->getMessage());
                 })->startOn($this->host, $this->port);
 
                 // 必须在这里wait，否则就跑到下面的 finally 了
