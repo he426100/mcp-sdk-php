@@ -50,6 +50,8 @@ use Ratchet\ConnectionInterface;
 use Ratchet\WebSocket\WsServerInterface;
 use RuntimeException;
 use InvalidArgumentException;
+use Swow\Coroutine;
+use Swow\Channel;
 
 /**
  * Class WebSocketServerTransport
@@ -74,6 +76,12 @@ class WebSocketServerTransport implements Transport, MessageComponentInterface, 
     /** @var LoggerInterface */
     private LoggerInterface $logger;
 
+    /** @var Channel */
+    private Channel $read;
+
+    /** @var Channel */
+    private Channel $write;
+
     /**
      * WebSocketServerTransport constructor.
      *
@@ -83,10 +91,22 @@ class WebSocketServerTransport implements Transport, MessageComponentInterface, 
         ?LoggerInterface $logger = null
     ) {
         $this->logger = $logger ?? new NullLogger();
+        $this->read = new Channel();
+        $this->write = new Channel();
     }
 
     /**
-     * Starts the WebSocket transport.
+     * Returns the read and write channels used for message passing.
+     *
+     * @return array{Channel, Channel} Array containing [read channel, write channel]
+     */
+    public function getStreams(): array
+    {
+        return [$this->read, $this->write];
+    }
+
+    /**
+     * Starts the WebSocket transport and message processing coroutines.
      *
      * @throws RuntimeException If the transport is already started or if no session is attached.
      *
@@ -103,6 +123,7 @@ class WebSocketServerTransport implements Transport, MessageComponentInterface, 
         }
 
         $this->isStarted = true;
+        $this->run();
         $this->logger->debug('WebSocket transport started');
     }
 
@@ -189,8 +210,11 @@ class WebSocketServerTransport implements Transport, MessageComponentInterface, 
 
         try {
             $message = $this->buildMessage($data, $hasMethod, $hasId, $hasResult, $hasError, $id);
-
-            // TODO: 实现onMessage的处理
+            
+            // Push message to read channel for processing
+            $this->read->push($message);
+            
+            $this->logger->debug('Received WebSocket message');
         } catch (McpError $e) {
             // Send error response
             $error = $e->error;
@@ -468,5 +492,22 @@ class WebSocketServerTransport implements Transport, MessageComponentInterface, 
     public function getSubProtocols(): array
     {
         return ['mcp'];
+    }
+
+    /**
+     * Runs the message processing coroutines.
+     *
+     * @return void
+     */
+    protected function run()
+    {
+        Coroutine::run(function (): void{
+            while ($this->isStarted) {
+                $message = $this->write->pop();
+                if ($message !== null) {
+                    $this->writeMessage($message);
+                }
+            }
+        });
     }
 }
