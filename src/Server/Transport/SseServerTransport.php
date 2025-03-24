@@ -45,6 +45,9 @@ use Mcp\Types\Result;
 use Mcp\Types\Meta;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
+use Swow\Channel;
+use Swow\Coroutine;
+use Swow\Psr7\Server\ServerConnection;
 use RuntimeException;
 use InvalidArgumentException;
 
@@ -56,9 +59,9 @@ use InvalidArgumentException;
  * This transport manages Server-Sent Events (SSE) connections, allowing the server
  * to push JSON-RPC messages to connected clients and handle incoming messages via POST requests.
  */
-class SseServerTransport implements Transport, SessionAwareTransport
+class SseServerTransport implements Transport
 {
-    /** @var array<string, array{created: int, lastSeen: int, output: resource}> */
+    /** @var array<string, array{created: int, lastSeen: int, output: ServerConnection}> */
     private array $sessions = [];
     /** @var BaseSession|null */
     private ?BaseSession $session = null;
@@ -66,6 +69,10 @@ class SseServerTransport implements Transport, SessionAwareTransport
     private bool $isStarted = false;
     /** @var LoggerInterface */
     private LoggerInterface $logger;
+
+    /** 模拟python的read_stream和write_stream */
+    private Channel $read;
+    private Channel $write;
 
     /**
      * SseServerTransport constructor.
@@ -84,6 +91,14 @@ class SseServerTransport implements Transport, SessionAwareTransport
         }
 
         $this->logger = $logger ?? new NullLogger();
+
+        $this->read = new Channel();
+        $this->write = new Channel();
+    }
+
+    public function getStreams(): array
+    {
+        return [$this->read, $this->write];
     }
 
     /**
@@ -99,11 +114,8 @@ class SseServerTransport implements Transport, SessionAwareTransport
             throw new RuntimeException('Transport already started');
         }
 
-        if ($this->session === null) {
-            throw new RuntimeException('No session attached to transport');
-        }
-
         $this->isStarted = true;
+        $this->run();
         $this->logger->debug('SSE transport started');
     }
 
@@ -130,36 +142,19 @@ class SseServerTransport implements Transport, SessionAwareTransport
     }
 
     /**
-     * Attaches a session to the transport.
-     *
-     * @param BaseSession $session The session to attach.
-     *
-     * @return void
-     */
-    public function attachSession(BaseSession $session): void
-    {
-        $this->session = $session;
-        $this->logger->debug('Session attached to SSE transport');
-    }
-
-    /**
      * Handles the initial SSE connection from a client.
      *
-     * @param resource $output An output stream resource to write SSE events to.
+     * @param ServerConnection $output An output stream resource to write SSE events to.
      *
      * @return string The generated session ID for this connection.
      *
      * @throws InvalidArgumentException If the output is not a valid resource.
      * @throws RuntimeException         If the transport is not started.
      */
-    public function handleSseRequest($output): string
+    public function handleSseRequest(ServerConnection $output): string
     {
         if (!$this->isStarted) {
             throw new RuntimeException('Transport not started');
-        }
-
-        if (!is_resource($output)) {
-            throw new InvalidArgumentException('Output must be a valid resource.');
         }
 
         $sessionId = bin2hex(random_bytes(16));
@@ -172,10 +167,13 @@ class SseServerTransport implements Transport, SessionAwareTransport
         ];
 
         // Set SSE headers (assuming this method is called before headers are sent)
-        header('Content-Type: text/event-stream');
-        header('Cache-Control: no-cache');
-        header('Connection: keep-alive');
-        header('X-Accel-Buffering: no'); // Disable response buffering
+        $output->respond([
+            'Cache-Control' => 'no-cache',
+            'Content-Type' => 'text/event-stream',
+            'Content-Length' => null,
+            'Connection' => 'keep-alive',
+            'X-Accel-Buffering' => 'no', // Disable response buffering
+        ]);
 
         // Send initial event with endpoint information
         $this->sendSseEvent($sessionId, 'endpoint', "{$this->endpoint}?session_id={$sessionId}");
@@ -316,9 +314,7 @@ class SseServerTransport implements Transport, SessionAwareTransport
             $this->logger->debug("Received message from session $sessionId");
 
             // Pass message to the session
-            if ($this->session !== null) {
-                $this->session->handleIncomingMessage($message);
-            }
+            $this->read->push($message);
         } catch (McpError $e) {
             throw $e;
         } catch (\Exception $e) {
@@ -418,14 +414,7 @@ class SseServerTransport implements Transport, SessionAwareTransport
 
         $sseData = "event: {$event}\ndata: {$data}\n\n";
 
-        $bytesWritten = fwrite($output, $sseData);
-        if ($bytesWritten === false) {
-            $this->logger->error("Failed to write SSE event to session: $sessionId");
-            // Optionally, handle the broken connection by removing the session
-            fclose($output);
-            unset($this->sessions[$sessionId]);
-            return;
-        }
+        $output->send($sseData);
 
         $this->logger->debug("Sent SSE event '{$event}' to session: $sessionId");
     }
@@ -447,5 +436,25 @@ class SseServerTransport implements Transport, SessionAwareTransport
                 $this->logger->debug("Cleaned up expired session: $sessionId");
             }
         }
+    }
+
+    protected function run()
+    {
+        Coroutine::run(function (): void {
+            while ($this->isStarted) {
+                $message = $this->readMessage();
+                if ($message !== null) {
+                    $this->read->push($message);
+                }
+            }
+        });
+        Coroutine::run(function (): void {
+            while ($this->isStarted) {
+                $message = $this->write->pop();
+                if ($message !== null) {
+                    $this->writeMessage($message);
+                }
+            }
+        });
     }
 }
