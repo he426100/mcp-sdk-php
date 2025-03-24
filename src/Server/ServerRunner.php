@@ -38,13 +38,13 @@ use Mcp\Types\ServerCapabilities;
 use Psr\Log\LoggerInterface;
 use Psr\Log\LogLevel;
 use Swoole\Coroutine;
-use Swoole\Coroutine\WaitGroup;
 use Swoole\Http\Request as HttpRequest;
 use Swoole\Coroutine\Http\Server as HttpServer;
 use Swoole\Http\Request;
 use Swoole\Http\Response;
 use function Swoole\Coroutine\run;
 use RuntimeException;
+use Swoole\Coroutine\Channel;
 
 /**
  * Main entry point for running an MCP server synchronously using STDIO transport.
@@ -75,8 +75,8 @@ class ServerRunner
 
 
         if ($this->transport == 'sse') {
-            try {
-                run(function () use ($server, $initOptions) {
+            run(function () use ($server, $initOptions) {
+                try {
                     $transport = new SseServerTransport('/messages', $this->logger);
                     $transport->start();
 
@@ -107,22 +107,22 @@ class ServerRunner
                     });
 
                     $httpServer->start();
-                });
-            } catch (\Exception $e) {
-                $this->logger->error('Server error: ' . $e->getMessage());
-                throw $e;
-            } finally {
-                if (isset($session)) {
-                    $session->stop();
+                } catch (\Exception $e) {
+                    $this->logger->error('Server error: ' . $e->getMessage());
+                    throw $e;
+                } finally {
+                    if (isset($session)) {
+                        $session->stop();
+                    }
+                    if (isset($transport)) {
+                        $transport->stop();
+                    }
+                    $this->logger->debug('Server stopped');
                 }
-                if (isset($transport)) {
-                    $transport->stop();
-                }
-                $this->logger->debug('Server stopped');
-            }
+            });
         } else {
-            try {
-                run(function () use ($server, $initOptions) {
+            run(function () use ($server, $initOptions) {
+                try {
                     $transport = StdioServerTransport::create();
                     $transport->start();
 
@@ -140,19 +140,21 @@ class ServerRunner
                     $session->start();
 
                     $this->logger->info('Server started');
-                });
-            } catch (\Exception $e) {
-                $this->logger->error('Server error: ' . $e->getMessage());
-                throw $e;
-            } finally {
-                if (isset($session)) {
-                    $session->stop();
+
+                    (new Channel())->pop();
+                } catch (\Exception $e) {
+                    $this->logger->error('Server error: ' . $e->getMessage());
+                    throw $e;
+                } finally {
+                    if (isset($session)) {
+                        $session->stop();
+                    }
+                    if (isset($transport)) {
+                        $transport->stop();
+                    }
+                    $this->logger->debug('Server stopped');
                 }
-                if (isset($transport)) {
-                    $transport->stop();
-                }
-                $this->logger->debug('Server stopped');
-            }
+            });
         }
     }
 }

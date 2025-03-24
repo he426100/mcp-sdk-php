@@ -504,7 +504,7 @@ class WebSocketServerTransport implements Transport, MessageComponentInterface, 
         Coroutine::create(function (): void{
             while ($this->isStarted) {
                 $message = $this->write->pop();
-                if ($message !== null) {
+                if ($message !== null && $message !== false) {
                     $this->writeMessage($message);
                 }
             }
