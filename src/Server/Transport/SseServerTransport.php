@@ -448,14 +448,6 @@ class SseServerTransport implements Transport
     {
         Coroutine::run(function (): void {
             while ($this->isStarted) {
-                $message = $this->readMessage();
-                if ($message !== null) {
-                    $this->read->push($message);
-                }
-            }
-        });
-        Coroutine::run(function (): void {
-            while ($this->isStarted) {
                 $message = $this->write->pop();
                 if ($message !== null) {
                     $this->writeMessage($message);
