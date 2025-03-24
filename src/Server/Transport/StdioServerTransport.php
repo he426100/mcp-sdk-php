@@ -309,25 +309,17 @@ class StdioServerTransport implements Transport
     {
         Coroutine::run(function (): void {
             while ($this->isStarted) {
-                try {
-                    $message = $this->readMessage();
-                    if ($message !== null) {
-                        $this->read->push($message);
-                    }
-                } catch (\Throwable $e) {
-                    // 协程错误记录
-                    error_log("读取协程错误: " . $e->getMessage());
+                $message = $this->readMessage();
+                if ($message !== null) {
+                    $this->read->push($message);
                 }
             }
         });
         Coroutine::run(function (): void {
             while ($this->isStarted) {
-                try {
-                    $message = $this->write->pop();
+                $message = $this->write->pop();
+                if ($message !== null) {
                     $this->writeMessage($message);
-                } catch (\Throwable $e) {
-                    // 协程错误记录
-                    error_log("写入协程错误: " . $e->getMessage());
                 }
             }
         });
