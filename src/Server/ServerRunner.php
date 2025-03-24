@@ -37,13 +37,13 @@ use Mcp\Server\InitializationOptions;
 use Mcp\Types\ServerCapabilities;
 use Psr\Log\LoggerInterface;
 use Psr\Log\LogLevel;
-use Swow\Coroutine;
-use function Swow\Sync\waitAll;
-use Swow\WatchDog;
-use Swow\Psr7\Message\ServerRequest as HttpRequest;
-use Swow\Psr7\Server\EventDriver;
-use Swow\Psr7\Server\Server as Psr7Server;
-use Swow\Psr7\Server\ServerConnection;
+use Swoole\Coroutine;
+use Swoole\Coroutine\WaitGroup;
+use Swoole\Http\Request as HttpRequest;
+use Swoole\Coroutine\Http\Server as HttpServer;
+use Swoole\Http\Request;
+use Swoole\Http\Response;
+use function Swoole\Coroutine\run;
 use RuntimeException;
 
 /**
@@ -73,43 +73,41 @@ class ServerRunner
             error_reporting(E_ERROR | E_PARSE);
         }
 
-        WatchDog::run();
 
         if ($this->transport == 'sse') {
             try {
-                $transport = new SseServerTransport('/messages', $this->logger);
-                $transport->start();
+                run(function () use ($server, $initOptions) {
+                    $transport = new SseServerTransport('/messages', $this->logger);
+                    $transport->start();
 
-                list($read, $write) = $transport->getStreams();
-                $session = new ServerSession(
-                    $read,
-                    $write,
-                    $initOptions,
-                    $this->logger
-                );
+                    list($read, $write) = $transport->getStreams();
+                    $session = new ServerSession(
+                        $read,
+                        $write,
+                        $initOptions,
+                        $this->logger
+                    );
 
-                // Add handlers
-                $session->registerHandlers($server->getHandlers());
-                $session->registerNotificationHandlers($server->getNotificationHandlers());
-                $session->start();
+                    // Add handlers
+                    $session->registerHandlers($server->getHandlers());
+                    $session->registerNotificationHandlers($server->getNotificationHandlers());
+                    $session->start();
 
-                $this->logger->info('Server started');
+                    $this->logger->info('Server started');
 
-                $server = new EventDriver(new Psr7Server());
-                $server->withRequestHandler(function (ServerConnection $connection, HttpRequest $request) use ($transport): void {
-                    $uri = $request->getUri()->getPath();
-                    if ($uri == '/sse') {
-                        $transport->handleSseRequest($connection);
-                    } elseif ($uri == '/messages') {
-                        $sessionId = (string)$request->getQueryParams()['session_id'];
-                        $transport->handlePostRequest($sessionId, (string)$request->getBody());
-                    }
-                })->withExceptionHandler(function (ServerConnection $connection, \Exception $e) {
-                    $this->logger->error('sse server: ' . $e->getMessage());
-                })->startOn($this->host, $this->port);
+                    $httpServer = new HttpServer($this->host, $this->port);
 
-                // 必须在这里wait，否则就跑到下面的 finally 了
-                waitAll();
+                    $httpServer->handle('/sse', function (Request $request, Response $response) use ($transport) {
+                        $transport->handleSseRequest($response);
+                    });
+
+                    $httpServer->handle('/messages', function (Request $request, Response $response) use ($transport) {
+                        $sessionId = $request->get['session_id'] ?? '';
+                        $transport->handlePostRequest($sessionId, $request->rawContent());
+                    });
+
+                    $httpServer->start();
+                });
             } catch (\Exception $e) {
                 $this->logger->error('Server error: ' . $e->getMessage());
                 throw $e;
@@ -120,29 +118,29 @@ class ServerRunner
                 if (isset($transport)) {
                     $transport->stop();
                 }
+                $this->logger->debug('Server stopped');
             }
         } else {
             try {
-                $transport = StdioServerTransport::create();
-                $transport->start();
+                run(function () use ($server, $initOptions) {
+                    $transport = StdioServerTransport::create();
+                    $transport->start();
 
-                list($read, $write) = $transport->getStreams();
-                $session = new ServerSession(
-                    $read,
-                    $write,
-                    $initOptions,
-                    $this->logger
-                );
+                    list($read, $write) = $transport->getStreams();
+                    $session = new ServerSession(
+                        $read,
+                        $write,
+                        $initOptions,
+                        $this->logger
+                    );
 
-                // Add handlers
-                $session->registerHandlers($server->getHandlers());
-                $session->registerNotificationHandlers($server->getNotificationHandlers());
-                $session->start();
+                    // Add handlers
+                    $session->registerHandlers($server->getHandlers());
+                    $session->registerNotificationHandlers($server->getNotificationHandlers());
+                    $session->start();
 
-                $this->logger->info('Server started');
-
-                // 必须在这里wait，否则就跑到下面的 finally 了
-                waitAll();
+                    $this->logger->info('Server started');
+                });
             } catch (\Exception $e) {
                 $this->logger->error('Server error: ' . $e->getMessage());
                 throw $e;
@@ -153,6 +151,7 @@ class ServerRunner
                 if (isset($transport)) {
                     $transport->stop();
                 }
+                $this->logger->debug('Server stopped');
             }
         }
     }

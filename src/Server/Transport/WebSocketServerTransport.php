@@ -50,8 +50,8 @@ use Ratchet\ConnectionInterface;
 use Ratchet\WebSocket\WsServerInterface;
 use RuntimeException;
 use InvalidArgumentException;
-use Swow\Coroutine;
-use Swow\Channel;
+use Swoole\Coroutine;
+use Swoole\Coroutine\Channel;
 
 /**
  * Class WebSocketServerTransport
@@ -91,8 +91,8 @@ class WebSocketServerTransport implements Transport, MessageComponentInterface, 
         ?LoggerInterface $logger = null
     ) {
         $this->logger = $logger ?? new NullLogger();
-        $this->read = new Channel();
-        $this->write = new Channel();
+        $this->read = new Channel(1);
+        $this->write = new Channel(1);
     }
 
     /**
@@ -501,7 +501,7 @@ class WebSocketServerTransport implements Transport, MessageComponentInterface, 
      */
     protected function run()
     {
-        Coroutine::run(function (): void{
+        Coroutine::create(function (): void{
             while ($this->isStarted) {
                 $message = $this->write->pop();
                 if ($message !== null) {

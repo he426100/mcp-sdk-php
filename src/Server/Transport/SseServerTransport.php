@@ -45,9 +45,9 @@ use Mcp\Types\Result;
 use Mcp\Types\Meta;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
-use Swow\Channel;
-use Swow\Coroutine;
-use Swow\Psr7\Server\ServerConnection;
+use Swoole\Coroutine;
+use Swoole\Coroutine\Channel;
+use Swoole\Http\Response;
 use RuntimeException;
 use InvalidArgumentException;
 
@@ -61,7 +61,7 @@ use InvalidArgumentException;
  */
 class SseServerTransport implements Transport
 {
-    /** @var array<string, array{created: int, lastSeen: int, output: ServerConnection}> */
+    /** @var array<string, array{created: int, lastSeen: int, output: Response}> */
     private array $sessions = [];
     /** @var BaseSession|null */
     private ?BaseSession $session = null;
@@ -92,8 +92,8 @@ class SseServerTransport implements Transport
 
         $this->logger = $logger ?? new NullLogger();
 
-        $this->read = new Channel();
-        $this->write = new Channel();
+        $this->read = new Channel(1);
+        $this->write = new Channel(1);
     }
 
     public function getStreams(): array
@@ -144,14 +144,14 @@ class SseServerTransport implements Transport
     /**
      * Handles the initial SSE connection from a client.
      *
-     * @param ServerConnection $output An output stream resource to write SSE events to.
+     * @param Response $output An output stream resource to write SSE events to.
      *
      * @return string The generated session ID for this connection.
      *
      * @throws InvalidArgumentException If the output is not a valid resource.
      * @throws RuntimeException         If the transport is not started.
      */
-    public function handleSseRequest(ServerConnection $output): string
+    public function handleSseRequest(Response $response): void
     {
         if (!$this->isStarted) {
             throw new RuntimeException('Transport not started');
@@ -163,24 +163,19 @@ class SseServerTransport implements Transport
         $this->sessions[$sessionId] = [
             'created' => $currentTime,
             'lastSeen' => $currentTime,
-            'output' => $output,
+            'output' => $response,
         ];
 
         // Set SSE headers (assuming this method is called before headers are sent)
-        $output->respond([
-            'Cache-Control' => 'no-cache',
-            'Content-Type' => 'text/event-stream',
-            'Content-Length' => null,
-            'Connection' => 'keep-alive',
-            'X-Accel-Buffering' => 'no', // Disable response buffering
-        ]);
+        $response->header('Content-Type', 'text/event-stream');
+        $response->header('Cache-Control', 'no-cache');
+        $response->header('Connection', 'keep-alive');
+        $response->header('X-Accel-Buffering', 'no'); // Disable response buffering
 
         // Send initial event with endpoint information
         $this->sendSseEvent($sessionId, 'endpoint', "{$this->endpoint}?session_id={$sessionId}");
 
         $this->logger->debug("New SSE connection established: $sessionId");
-
-        return $sessionId;
     }
 
     /**
@@ -414,9 +409,8 @@ class SseServerTransport implements Transport
 
         $sseData = "event: {$event}\ndata: {$data}\n\n";
 
-        try {
-            $output->send($sseData);
-        } catch (\Exception $e) {
+        $success = $output->write($sseData);
+        if ($success === false) {
             $this->logger->error("Failed to write SSE event to session: $sessionId");
             unset($this->sessions[$sessionId]);
             return;
@@ -437,7 +431,7 @@ class SseServerTransport implements Transport
         $now = time();
         foreach ($this->sessions as $sessionId => $session) {
             if ($now - $session['lastSeen'] > $maxAge) {
-                $session['output']->close();
+                $session['output']->end();
                 unset($this->sessions[$sessionId]);
                 $this->logger->debug("Cleaned up expired session: $sessionId");
             }
@@ -446,7 +440,7 @@ class SseServerTransport implements Transport
 
     protected function run()
     {
-        Coroutine::run(function (): void {
+        Coroutine::create(function () {
             while ($this->isStarted) {
                 $message = $this->write->pop();
                 if ($message !== null) {
