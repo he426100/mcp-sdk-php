@@ -27,6 +27,14 @@ composer require he426100/mcp-sdk-php
 * ext-curl
 * ext-pcntl (optional, recommended for CLI environments)
 
+### Swow Branch
+
+We have an [swow](https://github.com/he426100/mcp-sdk-php/tree/swow) branch that provides high-performance transports implementation:
+
+#### Features
+- Both stdio and SSE transports supported
+
+
 ## Basic Usage
 
 ### Creating an MCP Server
@@ -114,6 +122,7 @@ $runner->run();
 ```
 
 Save this as `example_server.php`
+
 
 ## Sample Project
 
