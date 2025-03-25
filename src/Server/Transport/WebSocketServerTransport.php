@@ -123,7 +123,6 @@ class WebSocketServerTransport implements Transport, MessageComponentInterface, 
         }
 
         $this->isStarted = true;
-        $this->run();
         $this->logger->debug('WebSocket transport started');
     }
 
@@ -144,6 +143,16 @@ class WebSocketServerTransport implements Transport, MessageComponentInterface, 
         $this->connections = [];
         $this->isStarted = false;
         $this->logger->debug('WebSocket transport stopped');
+    }
+
+    /**
+     * Checks if the transport is started.
+     *
+     * @return bool True if the transport is started, false otherwise.
+     */
+    public function isStarted(): bool
+    {
+        return $this->isStarted;
     }
 
     /**
@@ -492,22 +501,5 @@ class WebSocketServerTransport implements Transport, MessageComponentInterface, 
     public function getSubProtocols(): array
     {
         return ['mcp'];
-    }
-
-    /**
-     * Runs the message processing coroutines.
-     *
-     * @return void
-     */
-    protected function run()
-    {
-        Coroutine::run(function (): void{
-            while ($this->isStarted) {
-                $message = $this->write->pop();
-                if ($message !== null) {
-                    $this->writeMessage($message);
-                }
-            }
-        });
     }
 }
