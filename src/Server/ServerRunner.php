@@ -171,7 +171,7 @@ class ServerRunner
                 while (true) {
                     try {
                         // 获取并写入消息
-                        $message = $write->pop(3); // 3秒超时
+                        $message = $write->pop();
                         if ($message !== null) {
                             $transport->writeMessage($message);
                         }
@@ -261,7 +261,7 @@ class ServerRunner
             $this->spawnCoroutine(function () use ($transport, $writeChannel): void {
                 while ($transport->isStarted()) {
                     try {
-                        $message = $writeChannel->pop(3); // 3秒超时
+                        $message = $writeChannel->pop();
                         if ($message !== null) {
                             $transport->writeMessage($message);
                         }
