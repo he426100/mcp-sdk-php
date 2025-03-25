@@ -100,6 +100,49 @@ $runner->run($server, $initOptions);
 
 Save this as `example_server.php`
 
+### Using Annotations (Alternative Approach)
+
+
+```php
+<?php
+
+require 'vendor/autoload.php';
+
+use Mcp\Server\Server;
+use Mcp\Server\ServerRunner;
+use Mcp\Annotation\Prompt;
+use Mcp\Tool\McpHandlerRegistrar;
+
+$server = new Server('example-server');
+
+// Define the prompt handling class using annotations
+class ExamplePrompts 
+{
+    #[Prompt(
+        name: 'example-prompt',
+        description: 'An example prompt template',
+        arguments: [
+            'arg1' => [
+                'description' => 'Example argument',
+                'required' => true
+            ]
+        ]
+    )]
+    public function generatePrompt(string $arg1): string
+    {
+        return "Example prompt text with argument: $arg1";
+    }
+}
+
+// Register annotation processor
+(new McpHandlerRegistrar)->registerHandler($server, new ExamplePrompts());
+
+// Create initialization options and run server
+$initOptions = $server->createInitializationOptions();
+$runner = new ServerRunner();
+$runner->run($server, $initOptions);
+```
+
 ## Sample Project
 
 - [php-mcp-server](https://github.com/he426100/php-mcp-server)
