@@ -146,7 +146,6 @@ class ServerRunner
                     try {
                         // 读取消息
                         $message = $transport->readMessage();
-                        $this->logger->debug('runner read: ' . json_encode($message));
                         if ($message !== null) {
                             $read->push($message);
                         }
@@ -171,7 +170,6 @@ class ServerRunner
                         // 获取并写入消息
                         $message = $write->pop();
                         if ($message !== null) {
-                            $this->logger->debug('runner write: ' . json_encode($message));
                             $transport->writeMessage($message);
                         }
                     } catch (\Exception $e) {
@@ -290,7 +288,7 @@ class ServerRunner
                 $httpServer = new EventDriver(new Psr7Server());
                 $httpServer->withRequestHandler(function (ServerConnection $connection, HttpRequest $request) use ($transport): void {
                     $uri = $request->getUri()->getPath();
-                    $this->logger->debug('uri: ' . $uri);
+
                     try {
                         if ($uri == '/sse') {
                             // 处理SSE连接请求
