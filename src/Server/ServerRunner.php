@@ -31,6 +31,7 @@ namespace Mcp\Server;
 
 use Mcp\Server\Transport\StdioServerTransport;
 use Mcp\Server\Transport\SseServerTransport;
+use Mcp\Server\Transport\Transport;
 use Mcp\Server\ServerSession;
 use Mcp\Server\Server;
 use Mcp\Server\InitializationOptions;
@@ -60,7 +61,10 @@ class ServerRunner
     private ?WaitReference $waitRef = null;
     private Channel $controlSignal;
     private array $coroutines = [];
-    
+    private const MAX_SELECT_TIMOUT_US = 800000;
+    private ?Transport $transportInstance = null;
+    private ?ServerSession $sessionInstance = null;
+
     public function __construct(
         private ?LoggerInterface $logger = null,
         private string $transport = 'stdin',
@@ -80,6 +84,9 @@ class ServerRunner
         $this->waitRef = new WaitReference();
         
         try {
+            // 启动信号处理
+            $this->setupSignalHandling();
+            
             // 选择运行模式
             if ($this->transport == 'sse') {
                 $this->runSseServer($server, $initOptions);
@@ -87,12 +94,23 @@ class ServerRunner
                 $this->runStdioServer($server, $initOptions);
             }
             
+            // 监听控制信号
+            $this->spawnCoroutine(function (): void {
+                $signal = $this->controlSignal->pop();
+                if ($signal === 'shutdown') {
+                    $this->logger->info('Received shutdown signal, stopping server...');
+                    // 关闭组件
+                    $this->stopComponents();
+                }
+            });
+            
             // 等待所有协程完成
             WaitReference::wait($this->waitRef);
             $this->logger->info('Server stopped');
             
         } catch (\Exception $e) {
             $this->logger->error('Server error: ' . $e->getMessage());
+            $this->stopComponents();
             throw $e;
         }
     }
@@ -103,21 +121,20 @@ class ServerRunner
     private function runStdioServer(Server $server, InitializationOptions $initOptions): void
     {
         try {
-            // 创建transport
             $transport = StdioServerTransport::create();
+            $this->transportInstance = $transport;
             
-            // 启动transport，但不在内部创建协程
+            // 启动transport，但不要在transport内部创建协程
             $transport->start();
             
-            list($readChannel, $writeChannel) = $transport->getStreams();
-            
-            // 创建session
+            list($read, $write) = $transport->getStreams();
             $session = new ServerSession(
-                $readChannel,
-                $writeChannel,
+                $read,
+                $write,
                 $initOptions,
                 $this->logger
             );
+            $this->sessionInstance = $session;
             
             // 添加处理器
             $session->registerHandlers($server->getHandlers());
@@ -127,13 +144,13 @@ class ServerRunner
             $session->start();
             
             // 由ServerRunner管理读取消息的协程
-            $this->spawnCoroutine(function () use ($transport, $readChannel): void {
+            $this->spawnCoroutine(function () use ($transport, $read): void {
                 while (true) {
                     try {
                         // 读取消息
                         $message = $transport->readMessage();
                         if ($message !== null) {
-                            $readChannel->push($message);
+                            $read->push($message);
                         }
                     } catch (\Exception $e) {
                         $this->logger->error('Error reading message: ' . $e->getMessage());
@@ -145,16 +162,16 @@ class ServerRunner
                     }
                     
                     // 短暂休眠避免CPU占用过高
-                    usleep(800000);
+                    sleep(self::MAX_SELECT_TIMOUT_US);
                 }
             });
             
             // 由ServerRunner管理写入消息的协程
-            $this->spawnCoroutine(function () use ($transport, $writeChannel): void {
+            $this->spawnCoroutine(function () use ($transport, $write): void {
                 while (true) {
                     try {
                         // 获取并写入消息
-                        $message = $writeChannel->pop();
+                        $message = $write->pop(3); // 3秒超时
                         if ($message !== null) {
                             $transport->writeMessage($message);
                         }
@@ -184,7 +201,7 @@ class ServerRunner
                     }
                     
                     // 短暂休眠避免CPU占用过高
-                    usleep(800000);
+                    sleep(self::MAX_SELECT_TIMOUT_US);
                 }
             });
             
@@ -205,6 +222,7 @@ class ServerRunner
         try {
             // 创建transport
             $transport = new SseServerTransport('/messages', $this->logger);
+            $this->transportInstance = $transport;
             
             // 启动transport
             $transport->start();
@@ -218,6 +236,7 @@ class ServerRunner
                 $initOptions,
                 $this->logger
             );
+            $this->sessionInstance = $session;
             
             // 添加处理器
             $session->registerHandlers($server->getHandlers());
@@ -242,7 +261,7 @@ class ServerRunner
             $this->spawnCoroutine(function () use ($transport, $writeChannel): void {
                 while ($transport->isStarted()) {
                     try {
-                        $message = $writeChannel->pop();
+                        $message = $writeChannel->pop(3); // 3秒超时
                         if ($message !== null) {
                             $transport->writeMessage($message);
                         }
@@ -262,7 +281,7 @@ class ServerRunner
                     }
                     
                     // 短暂休眠避免CPU占用过高
-                    usleep(800000);
+                    sleep(self::MAX_SELECT_TIMOUT_US);
                 }
             });
             
@@ -335,10 +354,58 @@ class ServerRunner
     }
     
     /**
+     * 设置信号处理
+     */
+    private function setupSignalHandling(): void
+    {
+        if (extension_loaded('pcntl')) {
+            // 监听中断信号
+            pcntl_signal(SIGINT, function () {
+                $this->logger->info('Received SIGINT signal');
+                $this->controlSignal->push('shutdown');
+            });
+            pcntl_signal(SIGTERM, function () {
+                $this->logger->info('Received SIGTERM signal');
+                $this->controlSignal->push('shutdown');
+            });
+            
+            // 启动信号分发协程
+            $this->spawnCoroutine(function (): void {
+                while (true) {
+                    pcntl_signal_dispatch();
+                    sleep(self::MAX_SELECT_TIMOUT_US);
+                    
+                    // 检查组件状态，如果已关闭则退出
+                    if ($this->transportInstance && !$this->transportInstance->isStarted()) {
+                        break;
+                    }
+                }
+            });
+        } else {
+            $this->logger->warning('pcntl extension not loaded, signal handling disabled');
+        }
+    }
+    
+    /**
+     * 停止所有组件
+     */
+    private function stopComponents(): void
+    {
+        if ($this->transportInstance && $this->transportInstance->isStarted()) {
+            $this->transportInstance->stop();
+        }
+        
+        if ($this->sessionInstance && $this->sessionInstance->isStarted()) {
+            $this->sessionInstance->stop();
+        }
+    }
+    
+    /**
      * 关闭服务器
      */
     public function shutdown(): void
     {
+        $this->logger->info('Manual shutdown requested');
         $this->controlSignal->push('shutdown');
     }
 }
