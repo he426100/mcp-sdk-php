@@ -67,7 +67,7 @@ class ServerRunner
 
     public function __construct(
         private ?LoggerInterface $logger = null,
-        private string $transport = 'stdin',
+        private string $transport = 'stdio',
         private string $host = '0.0.0.0',
         private int $port = 8000,
     ) {
@@ -84,9 +84,6 @@ class ServerRunner
         $this->waitRef = new WaitReference();
         
         try {
-            // 启动信号处理
-            $this->setupSignalHandling();
-            
             // 选择运行模式
             if ($this->transport == 'sse') {
                 $this->runSseServer($server, $initOptions);
@@ -149,6 +146,7 @@ class ServerRunner
                     try {
                         // 读取消息
                         $message = $transport->readMessage();
+                        $this->logger->debug('runner read: ' . json_encode($message));
                         if ($message !== null) {
                             $read->push($message);
                         }
@@ -173,6 +171,7 @@ class ServerRunner
                         // 获取并写入消息
                         $message = $write->pop();
                         if ($message !== null) {
+                            $this->logger->debug('runner write: ' . json_encode($message));
                             $transport->writeMessage($message);
                         }
                     } catch (\Exception $e) {
@@ -284,58 +283,50 @@ class ServerRunner
                     sleep(self::MAX_SELECT_TIMOUT_US);
                 }
             });
-            
-            // 设置HTTP服务器
-            $httpServer = new EventDriver(new Psr7Server());
-            $httpServer->withRequestHandler(function (ServerConnection $connection, HttpRequest $request) use ($transport): void {
-                $uri = $request->getUri()->getPath();
-                
-                try {
-                    if ($uri == '/sse') {
-                        // 处理SSE连接请求
-                        $transport->handleSseRequest($connection);
-                    } elseif ($uri == '/messages') {
-                        // 处理POST消息请求
-                        $sessionId = (string)$request->getQueryParams()['session_id'];
-                        $transport->handlePostRequest($sessionId, (string)$request->getBody());
+    
+            // 启动HTTP服务器
+            $this->spawnCoroutine(function () use ($transport): void {
+                // 设置HTTP服务器
+                $httpServer = new EventDriver(new Psr7Server());
+                $httpServer->withRequestHandler(function (ServerConnection $connection, HttpRequest $request) use ($transport): void {
+                    $uri = $request->getUri()->getPath();
+                    $this->logger->debug('uri: ' . $uri);
+                    try {
+                        if ($uri == '/sse') {
+                            // 处理SSE连接请求
+                            $transport->handleSseRequest($connection);
+                        } elseif ($uri == '/messages') {
+                            // 处理POST消息请求
+                            $sessionId = (string)$request->getQueryParams()['session_id'];
+                            $transport->handlePostRequest($sessionId, (string)$request->getBody());
+                            $connection->respond([
+                                'Content-Type' => 'application/json',
+                            ], json_encode(['success' => true]));
+                        } else {
+                            // 处理404
+                            $connection->respond([
+                                'Content-Type' => 'application/json',
+                                'Status' => 404,
+                            ], json_encode(['error' => 'Not found']));
+                        }
+                    } catch (\Exception $e) {
+                        // 处理错误
                         $connection->respond([
                             'Content-Type' => 'application/json',
-                        ], json_encode(['success' => true]));
-                    } else {
-                        // 处理404
-                        $connection->respond([
-                            'Content-Type' => 'application/json',
-                            'Status' => 404,
-                        ], json_encode(['error' => 'Not found']));
+                            'Status' => 500,
+                        ], json_encode(['error' => $e->getMessage()]));
+                        $this->logger->error('HTTP request error: ' . $e->getMessage());
                     }
-                } catch (\Exception $e) {
-                    // 处理错误
+                })->withExceptionHandler(function (ServerConnection $connection, \Exception $e) {
+                    $this->logger->error('HTTP server error: ' . $e->getMessage());
                     $connection->respond([
                         'Content-Type' => 'application/json',
                         'Status' => 500,
-                    ], json_encode(['error' => $e->getMessage()]));
-                    $this->logger->error('HTTP request error: ' . $e->getMessage());
-                }
-            })->withExceptionHandler(function (ServerConnection $connection, \Exception $e) {
-                $this->logger->error('HTTP server error: ' . $e->getMessage());
-                $connection->respond([
-                    'Content-Type' => 'application/json',
-                    'Status' => 500,
-                ], json_encode(['error' => 'Server error']));
-            });
-            
-            // 启动HTTP服务器
-            $this->spawnCoroutine(function () use ($httpServer): void {
-                try {
-                    $httpServer->startOn($this->host, $this->port);
-                } catch (\Exception $e) {
-                    $this->logger->error('HTTP server error: ' . $e->getMessage());
-                    $this->controlSignal->push('shutdown');
-                }
+                    ], json_encode(['error' => 'Server error']));
+                })->startOn($this->host, $this->port);
             });
             
             $this->logger->info("SSE server started on http://{$this->host}:{$this->port}/sse");
-            
         } catch (\Exception $e) {
             $this->logger->error('SSE server initialization error: ' . $e->getMessage());
             $this->controlSignal->push('shutdown');
@@ -351,39 +342,6 @@ class ServerRunner
         $coroutineId = Coroutine::run($callback, $this->waitRef)->getId();
         $this->coroutines[] = $coroutineId;
         return $coroutineId;
-    }
-    
-    /**
-     * 设置信号处理
-     */
-    private function setupSignalHandling(): void
-    {
-        if (extension_loaded('pcntl')) {
-            // 监听中断信号
-            pcntl_signal(SIGINT, function () {
-                $this->logger->info('Received SIGINT signal');
-                $this->controlSignal->push('shutdown');
-            });
-            pcntl_signal(SIGTERM, function () {
-                $this->logger->info('Received SIGTERM signal');
-                $this->controlSignal->push('shutdown');
-            });
-            
-            // 启动信号分发协程
-            $this->spawnCoroutine(function (): void {
-                while (true) {
-                    pcntl_signal_dispatch();
-                    sleep(self::MAX_SELECT_TIMOUT_US);
-                    
-                    // 检查组件状态，如果已关闭则退出
-                    if ($this->transportInstance && !$this->transportInstance->isStarted()) {
-                        break;
-                    }
-                }
-            });
-        } else {
-            $this->logger->warning('pcntl extension not loaded, signal handling disabled');
-        }
     }
     
     /**
