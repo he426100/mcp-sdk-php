@@ -29,11 +29,7 @@ composer require he426100/mcp-sdk-php
 
 ### Swow Branch
 
-We have an [swow](https://github.com/he426100/mcp-sdk-php/tree/swow) branch that provides high-performance transports implementation:
-
-#### Features
-- Both stdio and SSE transports supported
-
+Both Stdio and SSE transports supported in [swow](https://github.com/he426100/mcp-sdk-php/tree/swow) and [swoole](https://github.com/he426100/mcp-sdk-php/tree/swoole) branch
 
 ## Basic Usage
 
