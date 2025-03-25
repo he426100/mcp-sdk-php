@@ -46,7 +46,6 @@ use Mcp\Types\Meta;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Swow\Channel;
-use Swow\Coroutine;
 use Swow\Psr7\Server\ServerConnection;
 use RuntimeException;
 use InvalidArgumentException;

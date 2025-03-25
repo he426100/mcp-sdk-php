@@ -50,7 +50,6 @@ use Ratchet\ConnectionInterface;
 use Ratchet\WebSocket\WsServerInterface;
 use RuntimeException;
 use InvalidArgumentException;
-use Swow\Coroutine;
 use Swow\Channel;
 
 /**
@@ -106,7 +105,7 @@ class WebSocketServerTransport implements Transport, MessageComponentInterface, 
     }
 
     /**
-     * Starts the WebSocket transport and message processing coroutines.
+     * Starts the WebSocket transport.
      *
      * @throws RuntimeException If the transport is already started or if no session is attached.
      *

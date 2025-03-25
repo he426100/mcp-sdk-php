@@ -50,7 +50,6 @@ use Mcp\Types\NotificationParams;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Swow\Channel;
-use Swow\Coroutine;
 use RuntimeException;
 use InvalidArgumentException;
 
