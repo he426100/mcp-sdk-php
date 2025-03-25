@@ -71,7 +71,7 @@ class ServerRunner
         private string $host = '0.0.0.0',
         private int $port = 8000,
     ) {
-        $this->controlSignal = new Channel(1); // 控制信号通道
+        $this->controlSignal = new Channel(); // 控制信号通道
         $this->logger = $logger ?? new NullLogger();
     }
 
@@ -160,7 +160,7 @@ class ServerRunner
                     }
                     
                     // 短暂休眠避免CPU占用过高
-                    sleep(self::MAX_SELECT_TIMOUT_US);
+                    usleep(self::MAX_SELECT_TIMOUT_US);
                 }
             });
             
@@ -200,7 +200,7 @@ class ServerRunner
                     }
                     
                     // 短暂休眠避免CPU占用过高
-                    sleep(self::MAX_SELECT_TIMOUT_US);
+                    usleep(self::MAX_SELECT_TIMOUT_US);
                 }
             });
             
@@ -280,7 +280,7 @@ class ServerRunner
                     }
                     
                     // 短暂休眠避免CPU占用过高
-                    sleep(self::MAX_SELECT_TIMOUT_US);
+                    usleep(self::MAX_SELECT_TIMOUT_US);
                 }
             });
     

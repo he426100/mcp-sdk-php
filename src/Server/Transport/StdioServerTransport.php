@@ -143,15 +143,10 @@ class StdioServerTransport implements Transport
             throw new RuntimeException('Transport not started');
         }
 
-        // 检查是否有数据可读
-        if (!$this->hasDataAvailable()) {
-            return null;
-        }
+        // Attempt to read a line from STDIN
+        $line = $this->input->recvMessageString();
 
         try {
-            // 从输入流读取消息并返回
-            $line = $this->input->recvMessageString();
-
             // Decode JSON with strict error handling
             $data = json_decode($line, true, 512, JSON_THROW_ON_ERROR);
         } catch (\JsonException $e) {
@@ -274,7 +269,12 @@ class StdioServerTransport implements Transport
             throw $e;
         } catch (\Exception $e) {
             // Other exceptions become parse errors
-            throw new RuntimeException('Error reading message: ' . $e->getMessage(), 0, $e);
+            throw new McpError(
+                new TypesErrorData(
+                    code: -32700,
+                    message: 'Parse error: ' . $e->getMessage()
+                )
+            );
         }
     }
 
