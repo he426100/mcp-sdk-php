@@ -27,7 +27,7 @@ composer require he426100/mcp-sdk-php
 * ext-curl
 * ext-pcntl (optional, recommended for CLI environments)
 
-### Swow Branch
+### Branch
 
 Both Stdio and SSE transports supported in [swow](https://github.com/he426100/mcp-sdk-php/tree/swow) and [swoole](https://github.com/he426100/mcp-sdk-php/tree/swoole) branch
 
