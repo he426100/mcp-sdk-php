@@ -393,12 +393,6 @@ class ServerSession extends BaseSession
         // Start reading messages from the transport
         // This could be a loop or a separate thread in a real implementation
         // For demonstration, we'll use a simple loop
-        Coroutine::create(function (): void {
-            while ($this->isInitialized) {
-                $message = $this->readNextMessage();
-                $this->handleIncomingMessage($message);
-            } 
-        });
     }
 
     protected function stopMessageProcessing(): void {}
@@ -420,5 +414,27 @@ class ServerSession extends BaseSession
         $message = $this->read->pop();
         $this->logger->debug('readNextMessage: ' . json_encode($message));
         return $message;
+    }
+
+    /**
+     * Check if the session is started.
+     */
+    public function isStarted(): bool
+    {
+        return $this->isInitialized;
+    }
+
+    /**
+     * Process the next message in the session.
+     */
+    public function processNextMessage(): void
+    {
+        try {
+            $message = $this->readNextMessage();
+            $this->handleIncomingMessage($message);
+        } catch (\Exception $e) {
+            // 处理异常
+            throw new RuntimeException('Error processing message: ' . $e->getMessage(), 0, $e);
+        }
     }
 }

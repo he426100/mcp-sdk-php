@@ -46,6 +46,12 @@ interface Transport
     public function stop(): void;
 
     /**
+     * is transport started
+     * @return bool 
+     */
+    public function isStarted(): bool;
+    
+    /**
      * 
      * @return array 
      */

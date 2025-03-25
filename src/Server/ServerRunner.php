@@ -31,6 +31,7 @@ namespace Mcp\Server;
 
 use Mcp\Server\Transport\StdioServerTransport;
 use Mcp\Server\Transport\SseServerTransport;
+use Mcp\Server\Transport\Transport;
 use Mcp\Server\ServerSession;
 use Mcp\Server\Server;
 use Mcp\Server\InitializationOptions;
@@ -38,13 +39,15 @@ use Mcp\Types\ServerCapabilities;
 use Psr\Log\LoggerInterface;
 use Psr\Log\LogLevel;
 use Swoole\Coroutine;
-use Swoole\Http\Request as HttpRequest;
 use Swoole\Coroutine\Http\Server as HttpServer;
 use Swoole\Http\Request;
 use Swoole\Http\Response;
-use function Swoole\Coroutine\run;
+use Swoole\Http\Status;
 use RuntimeException;
 use Swoole\Coroutine\Channel;
+use Swoole\Coroutine\Barrier;
+use Psr\Log\NullLogger;
+use function Swoole\Coroutine\run;
 
 /**
  * Main entry point for running an MCP server synchronously using STDIO transport.
@@ -54,17 +57,25 @@ use Swoole\Coroutine\Channel;
  */
 class ServerRunner
 {
+    private ?barrier $waitRef = null;
+    private Channel $controlSignal;
+
+    private const MAX_SELECT_TIMOUT_US = 800000;
+    private ?Transport $transportInstance = null;
+    private ?ServerSession $sessionInstance = null;
+
     public function __construct(
         private ?LoggerInterface $logger = null,
-        private string $transport = 'stdin',
+        private string $transport = 'stdio',
         private string $host = '0.0.0.0',
         private int $port = 8000,
-    ) {}
+    ) {
+        $this->controlSignal = new Channel(1); // 控制信号通道
+        $this->logger = $logger ?? new NullLogger();
+    }
 
     /**
-     * Run the server using STDIO transport.
-     *
-     * This sets up a ServerSession with a StdioServerTransport and enters a loop to read messages.
+     * 运行服务器
      */
     public function run(Server $server, InitializationOptions $initOptions): void
     {
@@ -73,88 +84,280 @@ class ServerRunner
             error_reporting(E_ERROR | E_PARSE);
         }
 
+        run(function () use ($server, $initOptions) {
+            // 创建WaitReference
+            $this->waitRef = Barrier::make();
 
-        if ($this->transport == 'sse') {
-            run(function () use ($server, $initOptions) {
-                try {
-                    $transport = new SseServerTransport('/messages', $this->logger);
-                    $transport->start();
+            try {
+                // 选择运行模式
+                if ($this->transport == 'sse') {
+                    $this->runSseServer($server, $initOptions);
+                } else {
+                    $this->runStdioServer($server, $initOptions);
+                }
 
-                    list($read, $write) = $transport->getStreams();
-                    $session = new ServerSession(
-                        $read,
-                        $write,
-                        $initOptions,
-                        $this->logger
-                    );
-
-                    // Add handlers
-                    $session->registerHandlers($server->getHandlers());
-                    $session->registerNotificationHandlers($server->getNotificationHandlers());
-                    $session->start();
-
-                    $this->logger->info('Server started');
-
-                    $httpServer = new HttpServer($this->host, $this->port);
-
-                    $httpServer->handle('/sse', function (Request $request, Response $response) use ($transport) {
-                        $transport->handleSseRequest($response);
-                    });
-
-                    $httpServer->handle('/messages', function (Request $request, Response $response) use ($transport) {
-                        $sessionId = $request->get['session_id'] ?? '';
-                        $transport->handlePostRequest($sessionId, $request->rawContent());
-                    });
-
-                    $httpServer->start();
-                } catch (\Exception $e) {
-                    $this->logger->error('Server error: ' . $e->getMessage());
-                    throw $e;
-                } finally {
-                    if (isset($session)) {
-                        $session->stop();
+                // 监听控制信号
+                $this->spawnCoroutine(function (): void {
+                    $signal = $this->controlSignal->pop();
+                    if ($signal === 'shutdown') {
+                        $this->logger->info('Received shutdown signal, stopping server...');
+                        // 关闭组件
+                        $this->stopComponents();
                     }
-                    if (isset($transport)) {
-                        $transport->stop();
+                });
+
+                // 等待所有协程完成
+                Barrier::wait($this->waitRef);
+                $this->logger->info('Server stopped');
+            } catch (\Throwable $e) {
+                $this->logger->error('Server error: ' . $e->getMessage());
+                throw $e;
+            } finally {
+                $this->stopComponents();
+            }
+        });
+    }
+
+    /**
+     * 运行STDIO服务器
+     */
+    private function runStdioServer(Server $server, InitializationOptions $initOptions): void
+    {
+        try {
+            $transport = StdioServerTransport::create();
+            $this->transportInstance = $transport;
+
+            // 启动transport，但不要在transport内部创建协程
+            $transport->start();
+
+            list($read, $write) = $transport->getStreams();
+            $session = new ServerSession(
+                $read,
+                $write,
+                $initOptions,
+                $this->logger
+            );
+            $this->sessionInstance = $session;
+
+            // 添加处理器
+            $session->registerHandlers($server->getHandlers());
+            $session->registerNotificationHandlers($server->getNotificationHandlers());
+
+            // 启动session
+            $session->start();
+
+            // 由ServerRunner管理读取消息的协程
+            $this->spawnCoroutine(function () use ($transport, $read): void {
+                while (true) {
+                    try {
+                        // 读取消息
+                        $message = $transport->readMessage();
+                        if ($message !== null) {
+                            $read->push($message);
+                        }
+                    } catch (\Exception $e) {
+                        $this->logger->error('Error reading message: ' . $e->getMessage());
                     }
-                    $this->logger->debug('Server stopped');
+
+                    // 检查是否应该退出
+                    if (!$transport->isStarted()) {
+                        break;
+                    }
+
+                    // 短暂休眠避免CPU占用过高
+                    usleep(self::MAX_SELECT_TIMOUT_US);
                 }
             });
-        } else {
-            run(function () use ($server, $initOptions) {
-                try {
-                    $transport = StdioServerTransport::create();
-                    $transport->start();
 
-                    list($read, $write) = $transport->getStreams();
-                    $session = new ServerSession(
-                        $read,
-                        $write,
-                        $initOptions,
-                        $this->logger
-                    );
-
-                    // Add handlers
-                    $session->registerHandlers($server->getHandlers());
-                    $session->registerNotificationHandlers($server->getNotificationHandlers());
-                    $session->start();
-
-                    $this->logger->info('Server started');
-
-                    (new Channel())->pop();
-                } catch (\Exception $e) {
-                    $this->logger->error('Server error: ' . $e->getMessage());
-                    throw $e;
-                } finally {
-                    if (isset($session)) {
-                        $session->stop();
+            // 由ServerRunner管理写入消息的协程
+            $this->spawnCoroutine(function () use ($transport, $write): void {
+                while (true) {
+                    try {
+                        // 获取并写入消息
+                        $message = $write->pop();
+                        if ($message !== null) {
+                            $transport->writeMessage($message);
+                        }
+                    } catch (\Exception $e) {
+                        $this->logger->error('Error writing message: ' . $e->getMessage());
                     }
-                    if (isset($transport)) {
-                        $transport->stop();
+
+                    // 检查是否应该退出
+                    if (!$transport->isStarted()) {
+                        break;
                     }
-                    $this->logger->debug('Server stopped');
                 }
             });
+
+            // 由ServerRunner管理处理消息的协程
+            $this->spawnCoroutine(function () use ($session): void {
+                while (true) {
+                    try {
+                        $session->processNextMessage();
+                    } catch (\Exception $e) {
+                        $this->logger->error('Error processing message: ' . $e->getMessage());
+                    }
+
+                    // 检查是否应该退出
+                    if (!$session->isStarted()) {
+                        break;
+                    }
+
+                    // 短暂休眠避免CPU占用过高
+                    usleep(self::MAX_SELECT_TIMOUT_US);
+                }
+            });
+
+            $this->logger->info('Server started');
+        } catch (\Throwable $e) {
+            $this->logger->error('Server initialization error: ' . $e->getMessage());
+            $this->controlSignal->push('shutdown');
+            throw $e;
         }
+    }
+
+    /**
+     * 运行SSE服务器
+     */
+    private function runSseServer(Server $server, InitializationOptions $initOptions): void
+    {
+        try {
+            // 创建transport
+            $transport = new SseServerTransport('/messages', $this->logger);
+            $this->transportInstance = $transport;
+
+            // 启动transport
+            $transport->start();
+
+            list($read, $write) = $transport->getStreams();
+
+            // 创建session
+            $session = new ServerSession(
+                $read,
+                $write,
+                $initOptions,
+                $this->logger
+            );
+            $this->sessionInstance = $session;
+
+            // 添加处理器
+            $session->registerHandlers($server->getHandlers());
+            $session->registerNotificationHandlers($server->getNotificationHandlers());
+
+            // 启动session
+            $session->start();
+
+            // 协程：定期清理过期的SSE会话
+            $this->spawnCoroutine(function () use ($transport): void {
+                while ($transport->isStarted()) {
+                    try {
+                        $transport->cleanupSessions();
+                        sleep(60); // 每分钟清理一次
+                    } catch (\Exception $e) {
+                        $this->logger->error('Error cleaning up sessions: ' . $e->getMessage());
+                    }
+                }
+            });
+
+            // 协程：处理写入消息
+            $this->spawnCoroutine(function () use ($transport, $write): void {
+                while ($transport->isStarted()) {
+                    try {
+                        $message = $write->pop();
+                        if ($message !== null) {
+                            $transport->writeMessage($message);
+                        }
+                    } catch (\Exception $e) {
+                        $this->logger->error('Error writing SSE message: ' . $e->getMessage());
+                    }
+                }
+            });
+
+            // 协程：处理消息
+            $this->spawnCoroutine(function () use ($session): void {
+                while ($session->isStarted()) {
+                    try {
+                        $session->processNextMessage();
+                    } catch (\Exception $e) {
+                        $this->logger->error('Error processing message: ' . $e->getMessage());
+                    }
+
+                    // 短暂休眠避免CPU占用过高
+                    usleep(self::MAX_SELECT_TIMOUT_US);
+                }
+            });
+
+            // 启动HTTP服务器
+            $this->spawnCoroutine(function () use ($transport): void {
+                // 设置HTTP服务器
+                $httpServer = new HttpServer($this->host, $this->port);
+
+                $httpServer->handle('/', function (Request $request, Response $response) use ($transport): void {
+                    $uri = $request->server['request_uri'];
+
+                    $response->header('Content-Type', 'application/json');
+                    try {
+                        if ($uri == '/sse') {
+                            // 处理SSE连接请求
+                            $transport->handleSseRequest($response);
+                        } elseif ($uri == '/messages') {
+                            // 处理POST消息请求
+                            $sessionId = (string)$request->get['session_id'];
+                            $transport->handlePostRequest($sessionId, (string)$request->rawContent());
+
+                            $response->end(json_encode(['success' => true]));
+                        } else {
+                            // 处理404
+                            $response->status(404, Status::getReasonPhrase(404));
+                            $response->end(json_encode(['error' => 'Not found']));
+                        }
+                    } catch (\Exception $e) {
+                        // 处理错误
+                        $response->status(500, Status::getReasonPhrase(500));
+                        $response->end(json_encode(['error' => $e->getMessage()]));
+                        $this->logger->error('HTTP request error: ' . $e->getMessage());
+                    }
+                });
+
+                $httpServer->start();
+            });
+
+            $this->logger->info("SSE server started on http://{$this->host}:{$this->port}/sse");
+        } catch (\Throwable $e) {
+            $this->logger->error('SSE server initialization error: ' . $e->getMessage());
+            $this->controlSignal->push('shutdown');
+            throw $e;
+        }
+    }
+
+    /**
+     * 创建并管理协程
+     */
+    private function spawnCoroutine(callable $callback): int
+    {
+        return Coroutine::create($callback, $this->waitRef);
+    }
+
+    /**
+     * 停止所有组件
+     */
+    private function stopComponents(): void
+    {
+        if ($this->transportInstance) {
+            $this->transportInstance->stop();
+        }
+
+        if ($this->sessionInstance) {
+            $this->sessionInstance->stop();
+        }
+    }
+
+    /**
+     * 关闭服务器
+     */
+    public function shutdown(): void
+    {
+        $this->logger->info('Manual shutdown requested');
+        $this->controlSignal->push('shutdown');
     }
 }

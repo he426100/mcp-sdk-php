@@ -115,7 +115,6 @@ class SseServerTransport implements Transport
         }
 
         $this->isStarted = true;
-        $this->run();
         $this->logger->debug('SSE transport started');
     }
 
@@ -132,7 +131,7 @@ class SseServerTransport implements Transport
 
         // Close all SSE connections
         foreach ($this->sessions as $sessionId => $session) {
-            $session['output']->close();
+            $session['output']->end();
             $this->logger->debug("Closed SSE connection: $sessionId");
         }
 
@@ -151,7 +150,7 @@ class SseServerTransport implements Transport
      * @throws InvalidArgumentException If the output is not a valid resource.
      * @throws RuntimeException         If the transport is not started.
      */
-    public function handleSseRequest(Response $response): void
+    public function handleSseRequest(Response $response): string
     {
         if (!$this->isStarted) {
             throw new RuntimeException('Transport not started');
@@ -176,6 +175,8 @@ class SseServerTransport implements Transport
         $this->sendSseEvent($sessionId, 'endpoint', "{$this->endpoint}?session_id={$sessionId}");
 
         $this->logger->debug("New SSE connection established: $sessionId");
+
+        return $sessionId;
     }
 
     /**
@@ -438,15 +439,11 @@ class SseServerTransport implements Transport
         }
     }
 
-    protected function run()
+    /**
+     * 检查传输层是否已启动
+     */
+    public function isStarted(): bool
     {
-        Coroutine::create(function () {
-            while ($this->isStarted) {
-                $message = $this->write->pop();
-                if ($message !== null && $message !== false) {
-                    $this->writeMessage($message);
-                }
-            }
-        });
+        return $this->isStarted;
     }
 }

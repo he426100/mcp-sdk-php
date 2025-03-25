@@ -43,9 +43,7 @@ use Mcp\Types\NotificationParams;
 use Mcp\Types\Result;
 use RuntimeException;
 use InvalidArgumentException;
-use Swoole\Coroutine;
 use Swoole\Coroutine\Channel;
-use Swoole\Coroutine\System;
 
 /**
  * Class StdioServerTransport
@@ -68,10 +66,12 @@ class StdioServerTransport implements Transport
     private Channel $write;
 
     /**
-     * StdinServerTransport 构造函数
-     * 
-     * @param resource|null $input 输入流（默认为标准输入）
-     * @param resource|null $output 输出流（默认为标准输出）
+     * StdioServerTransport constructor.
+     *
+     * @param resource|null $stdin  Input stream (defaults to STDIN)
+     * @param resource|null $stdout Output stream (defaults to STDOUT)
+     *
+     * @throws InvalidArgumentException If provided streams are not valid resources.
      */
     public function __construct(
         $stdin = null,
@@ -121,7 +121,6 @@ class StdioServerTransport implements Transport
         }
 
         $this->isStarted = true;
-        $this->run();
     }
 
     /**
@@ -158,7 +157,7 @@ class StdioServerTransport implements Transport
      * @throws RuntimeException If the transport is not started.
      * @throws McpError          If a JSON-RPC error occurs during parsing or validation.
      */
-    protected function readMessage(): ?JsonRpcMessage
+    public function readMessage(): ?JsonRpcMessage
     {
         if (!$this->isStarted) {
             throw new RuntimeException('Transport not started');
@@ -309,7 +308,7 @@ class StdioServerTransport implements Transport
      *
      * @throws RuntimeException If the transport is not started or if writing fails.
      */
-    protected function writeMessage(JsonRpcMessage $message): void
+    public function writeMessage(JsonRpcMessage $message): void
     {
         if (!$this->isStarted) {
             throw new RuntimeException('Transport not started');
@@ -361,43 +360,22 @@ class StdioServerTransport implements Transport
         fflush($this->stdout);
     }
 
-    protected function run()
+    /**
+     * Checks if the transport is started.
+     *
+     * @return bool True if the transport is started, false otherwise.
+     */
+    public function isStarted(): bool
     {
-        Coroutine::create(function () {
-            try {
-                while ($this->isStarted) {
-                    $message = $this->readMessage();
-                    if ($message !== null && $message !== false) {
-                        $this->read->push($message);
-                    }
-                }
-            } catch (\Throwable $e) {
-                // 添加错误日志
-                error_log("Error in read coroutine: " . $e->getMessage());
-                throw $e;
-            }
-        });
-        Coroutine::create(function () {
-            try {
-                while ($this->isStarted) {
-                    $message = $this->write->pop();
-                    if ($message !== null && $message !== false) {
-                        $this->writeMessage($message);
-                    }
-                }
-            } catch (\Throwable $e) {
-                // 添加错误日志
-                error_log("Error in read coroutine: " . $e->getMessage());
-                throw $e;
-            }
-        });
+        return $this->isStarted;
     }
 
     /**
-     * 创建 StdinServerTransport 的新实例
+     * Creates a new instance of StdioServerTransport with default STDIN and STDOUT.
      *
-     * @param resource|null $input 输入流
-     * @param resource|null $output 输出流
+     * @param resource|null $stdin  Input stream (defaults to STDIN)
+     * @param resource|null $stdout Output stream (defaults to STDOUT)
+     *
      * @return self
      */
     public static function create($stdin = null, $stdout = null): self
