@@ -39,7 +39,6 @@ use Mcp\Types\ServerCapabilities;
 use Psr\Log\LoggerInterface;
 use Psr\Log\LogLevel;
 use Swow\Coroutine;
-use function Swow\Sync\waitAll;
 use Swow\WatchDog;
 use Swow\Psr7\Message\ServerRequest as HttpRequest;
 use Swow\Psr7\Server\EventDriver;
@@ -60,7 +59,7 @@ class ServerRunner
 {
     private ?WaitReference $waitRef = null;
     private Channel $controlSignal;
-    private array $coroutines = [];
+
     private const MAX_SELECT_TIMOUT_US = 800000;
     private ?Transport $transportInstance = null;
     private ?ServerSession $sessionInstance = null;
@@ -80,6 +79,13 @@ class ServerRunner
      */
     public function run(Server $server, InitializationOptions $initOptions): void
     {
+        // Suppress warnings unless explicitly enabled (similar to Python code ignoring warnings)
+        if (!getenv('MCP_ENABLE_WARNINGS')) {
+            error_reporting(E_ERROR | E_PARSE);
+        }
+
+        WatchDog::run();
+
         // 创建WaitReference
         $this->waitRef = new WaitReference();
         
@@ -107,8 +113,9 @@ class ServerRunner
             
         } catch (\Exception $e) {
             $this->logger->error('Server error: ' . $e->getMessage());
-            $this->stopComponents();
             throw $e;
+        } finally {
+            $this->stopComponents();
         }
     }
     
@@ -224,12 +231,12 @@ class ServerRunner
             // 启动transport
             $transport->start();
             
-            list($readChannel, $writeChannel) = $transport->getStreams();
+            list($read, $write) = $transport->getStreams();
             
             // 创建session
             $session = new ServerSession(
-                $readChannel,
-                $writeChannel,
+                $read,
+                $write,
                 $initOptions,
                 $this->logger
             );
@@ -255,10 +262,10 @@ class ServerRunner
             });
             
             // 协程：处理写入消息
-            $this->spawnCoroutine(function () use ($transport, $writeChannel): void {
+            $this->spawnCoroutine(function () use ($transport, $write): void {
                 while ($transport->isStarted()) {
                     try {
-                        $message = $writeChannel->pop();
+                        $message = $write->pop();
                         if ($message !== null) {
                             $transport->writeMessage($message);
                         }
@@ -337,9 +344,8 @@ class ServerRunner
      */
     private function spawnCoroutine(callable $callback): int
     {
-        $coroutineId = Coroutine::run($callback, $this->waitRef)->getId();
-        $this->coroutines[] = $coroutineId;
-        return $coroutineId;
+        $coroutine = Coroutine::run($callback, $this->waitRef);
+        return $coroutine->getId();
     }
     
     /**
@@ -347,11 +353,11 @@ class ServerRunner
      */
     private function stopComponents(): void
     {
-        if ($this->transportInstance && $this->transportInstance->isStarted()) {
+        if ($this->transportInstance) {
             $this->transportInstance->stop();
         }
         
-        if ($this->sessionInstance && $this->sessionInstance->isStarted()) {
+        if ($this->sessionInstance) {
             $this->sessionInstance->stop();
         }
     }
