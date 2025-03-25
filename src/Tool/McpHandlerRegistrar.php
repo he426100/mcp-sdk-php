@@ -35,15 +35,15 @@ class McpHandlerRegistrar
     private static array $reflectionCache = [];
 
     /**
-     * 将服务处理器注册到MCP服务器
+     * 将处理器注册到MCP服务器
      *
      * @param Server $server MCP服务器实例
-     * @param object $service 服务实例
+     * @param object $handler 处理器实例
      * @return void
      */
-    public function registerService(Server $server, object $service): void
+    public function registerHandler(Server $server, object $handler): void
     {
-        $reflectionClass = new ReflectionClass($service);
+        $reflectionClass = new ReflectionClass($handler);
 
         // 处理各类注解
         [$tools, $toolMethodMap] = $this->processToolAnnotations($reflectionClass);
@@ -51,9 +51,9 @@ class McpHandlerRegistrar
         [$resources, $resourceUriMap] = $this->processResourceAnnotations($reflectionClass);
 
         // 注册各类处理器
-        $this->registerToolHandlers($server, $tools, $toolMethodMap, $reflectionClass, $service);
-        $this->registerPromptHandlers($server, $prompts, $promptMethodMap, $reflectionClass, $service);
-        $this->registerResourceHandlers($server, $resources, $resourceUriMap, $reflectionClass, $service);
+        $this->registerToolHandlers($server, $tools, $toolMethodMap, $reflectionClass, $handler);
+        $this->registerPromptHandlers($server, $prompts, $promptMethodMap, $reflectionClass, $handler);
+        $this->registerResourceHandlers($server, $resources, $resourceUriMap, $reflectionClass, $handler);
     }
 
     /**
@@ -132,7 +132,7 @@ class McpHandlerRegistrar
      * @param array $tools 工具定义数组
      * @param array $toolMethodMap 工具名称到方法名的映射
      * @param ReflectionClass $reflectionClass 反射类
-     * @param object $service 服务实例
+     * @param object $handler 处理器实例
      * @return void
      */
     protected function registerToolHandlers(
@@ -140,7 +140,7 @@ class McpHandlerRegistrar
         array $tools,
         array $toolMethodMap,
         ReflectionClass $reflectionClass,
-        object $service
+        object $handler
     ): void {
         if (empty($tools)) {
             return;
@@ -152,7 +152,7 @@ class McpHandlerRegistrar
         });
 
         // 注册工具调用处理器
-        $server->registerHandler('tools/call', function ($params) use ($tools, $reflectionClass, $toolMethodMap, $service) {
+        $server->registerHandler('tools/call', function ($params) use ($tools, $reflectionClass, $toolMethodMap, $handler) {
             $name = $params->name;
             $arguments = [];
             if (isset($params->arguments)) {
@@ -170,7 +170,7 @@ class McpHandlerRegistrar
 
             try {
                 $method = $this->getCachedMethod($reflectionClass, $methodName);
-                $result = $this->executeMethodSafely($method, $arguments, $service);
+                $result = $this->executeMethodSafely($method, $arguments, $handler);
 
                 return new CallToolResult(
                     content: [new TextContent(text: (string)$result)]
@@ -191,7 +191,7 @@ class McpHandlerRegistrar
      * @param array $prompts 提示模板定义数组
      * @param array $promptMethodMap 提示模板名称到方法名的映射
      * @param ReflectionClass $reflectionClass 反射类
-     * @param object $service 服务实例
+     * @param object $handler 处理器实例
      * @return void
      */
     protected function registerPromptHandlers(
@@ -199,7 +199,7 @@ class McpHandlerRegistrar
         array $prompts,
         array $promptMethodMap,
         ReflectionClass $reflectionClass,
-        object $service
+        object $handler
     ): void {
         if (empty($prompts)) {
             return;
@@ -211,7 +211,7 @@ class McpHandlerRegistrar
         });
 
         // 注册提示模板获取处理器
-        $server->registerHandler('prompts/get', function ($params) use ($prompts, $reflectionClass, $promptMethodMap, $service) {
+        $server->registerHandler('prompts/get', function ($params) use ($prompts, $reflectionClass, $promptMethodMap, $handler) {
             $name = $params->name;
             $arguments = [];
             if (isset($params->arguments)) {
@@ -226,7 +226,7 @@ class McpHandlerRegistrar
 
             try {
                 $method = $this->getCachedMethod($reflectionClass, $methodName);
-                $result = $this->executeMethodSafely($method, $arguments, $service);
+                $result = $this->executeMethodSafely($method, $arguments, $handler);
 
                 // 找到对应的prompt定义以获取描述
                 $promptDescription = '';
@@ -259,7 +259,7 @@ class McpHandlerRegistrar
      * @param array $resources 资源定义数组
      * @param array $resourceUriMap 资源URI到方法名的映射
      * @param ReflectionClass $reflectionClass 反射类
-     * @param object $service 服务实例
+     * @param object $handler 处理器实例
      * @return void
      */
     protected function registerResourceHandlers(
@@ -267,7 +267,7 @@ class McpHandlerRegistrar
         array $resources,
         array $resourceUriMap,
         ReflectionClass $reflectionClass,
-        object $service
+        object $handler
     ): void {
         if (empty($resources)) {
             return;
@@ -279,7 +279,7 @@ class McpHandlerRegistrar
         });
 
         // 注册资源读取处理器
-        $server->registerHandler('resources/read', function ($params) use ($resources, $reflectionClass, $resourceUriMap, $service) {
+        $server->registerHandler('resources/read', function ($params) use ($resources, $reflectionClass, $resourceUriMap, $handler) {
             $uri = $params->uri;
 
             if (!isset($resourceUriMap[$uri])) {
@@ -299,7 +299,7 @@ class McpHandlerRegistrar
 
             try {
                 $method = $this->getCachedMethod($reflectionClass, $methodName);
-                $content = $this->executeMethodSafely($method, [], $service);
+                $content = $this->executeMethodSafely($method, [], $handler);
 
                 return new ReadResourceResult(
                     contents: [
@@ -336,14 +336,14 @@ class McpHandlerRegistrar
      *
      * @param ReflectionMethod $method 要执行的方法
      * @param array $arguments 参数数组
-     * @param object $service 服务实例
+     * @param object $handler 处理器实例
      * @return mixed 方法返回值
      * @throws \RuntimeException 执行异常时
      */
-    protected function executeMethodSafely(ReflectionMethod $method, array $arguments, object $service)
+    protected function executeMethodSafely(ReflectionMethod $method, array $arguments, object $handler)
     {
         try {
-            return $method->invoke($service, ...$this->prepareArguments($method, $arguments));
+            return $method->invoke($handler, ...$this->prepareArguments($method, $arguments));
         } catch (\Throwable $e) {
             // 记录错误
             error_log("Error executing method {$method->getName()}: " . $e->getMessage());
