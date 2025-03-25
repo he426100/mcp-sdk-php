@@ -111,7 +111,7 @@ class ServerRunner
             WaitReference::wait($this->waitRef);
             $this->logger->info('Server stopped');
             
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             $this->logger->error('Server error: ' . $e->getMessage());
             throw $e;
         } finally {
@@ -211,7 +211,7 @@ class ServerRunner
             
             $this->logger->info('Server started');
             
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             $this->logger->error('Server initialization error: ' . $e->getMessage());
             $this->controlSignal->push('shutdown');
             throw $e;
@@ -332,7 +332,7 @@ class ServerRunner
             });
             
             $this->logger->info("SSE server started on http://{$this->host}:{$this->port}/sse");
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             $this->logger->error('SSE server initialization error: ' . $e->getMessage());
             $this->controlSignal->push('shutdown');
             throw $e;
