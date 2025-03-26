@@ -19,6 +19,8 @@ use Mcp\Types\ListResourcesResult;
 use Mcp\Types\ReadResourceResult;
 use Mcp\Types\TextResourceContents;
 use Mcp\Types\Role;
+use Mcp\Types\ImageContent;
+use Mcp\Types\EmbeddedResource;
 use ReflectionClass;
 use ReflectionMethod;
 use ReflectionParameter;
@@ -172,9 +174,8 @@ class McpHandlerRegistrar
                 $method = $this->getCachedMethod($reflectionClass, $methodName);
                 $result = $this->executeMethodSafely($method, $arguments, $handler);
 
-                return new CallToolResult(
-                    content: [new TextContent(text: (string)$result)]
-                );
+                $content = $this->processToolResult($result);
+                return new CallToolResult(content: $content);
             } catch (\Throwable $e) {
                 return new CallToolResult(
                     content: [new TextContent(text: "Error: " . $e->getMessage())],
@@ -182,6 +183,75 @@ class McpHandlerRegistrar
                 );
             }
         });
+    }
+
+    /**
+     * 处理工具返回值，转换为适当的内容类型
+     *
+     * @param mixed $result 工具方法的返回值
+     * @return array 内容数组
+     */
+    private function processToolResult(mixed $result): array
+    {
+        // 如果已经是内容类型数组，直接返回
+        if (is_array($result) && !empty($result) && $this->isContentArray($result)) {
+            return $result;
+        }
+
+        // 如果是单个内容对象，包装成数组
+        if ($this->isContentObject($result)) {
+            return [$result];
+        }
+
+        // 如果是字符串或其他标量类型，转换为TextContent
+        if (is_scalar($result) || (is_object($result) && method_exists($result, '__toString'))) {
+            return [new TextContent(text: (string)$result)];
+        }
+
+        // 如果是null，返回空字符串
+        if ($result === null) {
+            return [new TextContent(text: '')];
+        }
+
+        // 如果是数组或对象，转换为JSON字符串
+        if (is_array($result) || is_object($result)) {
+            return [new TextContent(text: json_encode(
+                $result,
+                JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
+            ))];
+        }
+
+        // 其他情况，转换为字符串
+        return [new TextContent(text: var_export($result, true))];
+    }
+
+    /**
+     * 检查是否为内容对象数组
+     *
+     * @param array $array 要检查的数组
+     * @return bool
+     */
+    private function isContentArray(array $array): bool
+    {
+        foreach ($array as $item) {
+            if (!$this->isContentObject($item)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * 检查是否为内容对象
+     *
+     * @param mixed $object 要检查的对象
+     * @return bool
+     */
+    private function isContentObject(mixed $object): bool
+    {
+        return $object instanceof TextContent
+            || $object instanceof ImageContent
+            || $object instanceof EmbeddedResource;
     }
 
     /**
