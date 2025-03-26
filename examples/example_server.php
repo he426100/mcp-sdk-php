@@ -25,12 +25,13 @@ use Mcp\Types\TextContent;
 use Mcp\Types\Role;
 use Mcp\Types\GetPromptResult;
 use Mcp\Types\GetPromptRequestParams;
-
 use Monolog\Logger;
 use Monolog\Level;
 use Monolog\Handler\StreamHandler;
 use Monolog\Handler\RotatingFileHandler;
 use Monolog\Formatter\LineFormatter;
+use Swow\Coroutine;
+use Swow\Signal;
 
 // Create a logger
 $logger = new Logger('mcp-server');
@@ -109,6 +110,11 @@ $server->registerHandler('prompts/get', function (GetPromptRequestParams $params
 // Create initialization options and run server
 $initOptions = $server->createInitializationOptions();
 $runner = new ServerRunner($logger);
+
+Coroutine::run(function () use ($logger, $runner): void {
+    Signal::wait(Signal::INT);
+    $runner->shutdown();
+});
 
 try {
     $runner->run($server, $initOptions);
