@@ -39,7 +39,6 @@ use Mcp\Types\ServerCapabilities;
 use Psr\Log\LoggerInterface;
 use Psr\Log\LogLevel;
 use Swow\Coroutine;
-use Swow\WatchDog;
 use Swow\Psr7\Message\ServerRequest as HttpRequest;
 use Swow\Psr7\Server\EventDriver;
 use Swow\Psr7\Server\Server as Psr7Server;
@@ -84,8 +83,6 @@ class ServerRunner
             error_reporting(E_ERROR | E_PARSE);
         }
 
-        WatchDog::run();
-
         // 创建WaitReference
         $this->waitRef = new WaitReference();
         
@@ -98,7 +95,7 @@ class ServerRunner
             }
             
             // 监听控制信号
-            $this->spawnCoroutine(function (): void {
+            Coroutine::run(function (): void {
                 $signal = $this->controlSignal->pop();
                 if ($signal === 'shutdown') {
                     $this->logger->info('Received shutdown signal, stopping server...');
