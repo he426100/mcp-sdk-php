@@ -21,12 +21,16 @@ use Mcp\Types\TextResourceContents;
 use Mcp\Types\Role;
 use Mcp\Types\ImageContent;
 use Mcp\Types\EmbeddedResource;
+use Mcp\Types\ResourceContents;
+use Mcp\Types\BlobResourceContents;
+use Mcp\Types\Content;
 use ReflectionClass;
 use ReflectionMethod;
 use ReflectionParameter;
 use Mcp\Annotation\Tool;
 use Mcp\Annotation\Prompt;
 use Mcp\Annotation\Resource;
+use Mcp\Types\Annotations;
 
 class McpHandlerRegistrar
 {
@@ -189,7 +193,7 @@ class McpHandlerRegistrar
      * 处理工具返回值，转换为适当的内容类型
      *
      * @param mixed $result 工具方法的返回值
-     * @return array 内容数组
+     * @return array<Content> 内容数组
      */
     private function processToolResult(mixed $result): array
     {
@@ -201,6 +205,11 @@ class McpHandlerRegistrar
         // 如果是单个内容对象，包装成数组
         if ($this->isContentObject($result)) {
             return [$result];
+        }
+
+        // 如果是资源内容，转换为 EmbeddedResource
+        if ($result instanceof ResourceContents) {
+            return [new EmbeddedResource($result)];
         }
 
         // 如果是字符串或其他标量类型，转换为TextContent
@@ -249,9 +258,10 @@ class McpHandlerRegistrar
      */
     private function isContentObject(mixed $object): bool
     {
-        return $object instanceof TextContent
-            || $object instanceof ImageContent
-            || $object instanceof EmbeddedResource;
+        return $object instanceof Content ||
+               $object instanceof TextContent ||
+               $object instanceof ImageContent ||
+               $object instanceof EmbeddedResource;
     }
 
     /**
@@ -530,28 +540,46 @@ class McpHandlerRegistrar
      * @param string $content 资源内容
      * @param string $mimeType MIME类型
      * @param string $uri 资源URI
-     * @return TextResourceContents 资源内容对象
+     * @return ResourceContents 资源内容对象
      */
-    protected function processResourceContent(string $content, string $mimeType, string $uri): TextResourceContents
+    protected function processResourceContent(string $content, string $mimeType, string $uri): ResourceContents
     {
-        // 对于大文件，可以使用分块处理或提示截断
-        $maxSize = 2 * 1024 * 1024; // 2MB限制示例
+        // 对于大文件，使用分块处理
+        $maxSize = 2 * 1024 * 1024; // 2MB限制
         if (strlen($content) > $maxSize) {
             $truncatedContent = substr($content, 0, $maxSize);
             $truncatedContent .= "\n... (content truncated, full size: " . strlen($content) . " bytes)";
 
+            // 根据MIME类型选择合适的资源内容类型
+            if (str_starts_with($mimeType, 'text/')) {
+                return new TextResourceContents(
+                    uri: $uri,
+                    text: $truncatedContent,
+                    mimeType: $mimeType
+                );
+            } else {
+                return new BlobResourceContents(
+                    uri: $uri,
+                    blob: $truncatedContent,
+                    mimeType: $mimeType
+                );
+            }
+        }
+
+        // 根据MIME类型选择合适的资源内容类型
+        if (str_starts_with($mimeType, 'text/')) {
             return new TextResourceContents(
                 uri: $uri,
-                text: $truncatedContent,
+                text: $content,
+                mimeType: $mimeType
+            );
+        } else {
+            return new BlobResourceContents(
+                uri: $uri,
+                blob: $content,
                 mimeType: $mimeType
             );
         }
-
-        return new TextResourceContents(
-            uri: $uri,
-            text: $content,
-            mimeType: $mimeType
-        );
     }
 
     /**
