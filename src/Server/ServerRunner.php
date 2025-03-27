@@ -35,6 +35,7 @@ use Mcp\Server\Transport\Transport;
 use Mcp\Server\ServerSession;
 use Mcp\Server\Server;
 use Mcp\Server\InitializationOptions;
+use Mcp\Shared\BaseSession;
 use Mcp\Types\ServerCapabilities;
 use Psr\Log\LoggerInterface;
 use Psr\Log\LogLevel;
@@ -371,6 +372,25 @@ class ServerRunner
                 $coroutine->kill();
             }
         }
+    }
+
+    /**
+     * 
+     * @return Transport 
+     */
+    public function getTransport(): Transport
+    {
+        return $this->transportInstance;
+    }
+
+
+    /**
+     * 
+     * @return ServerSession 
+     */
+    public function getSession(): ServerSession
+    {
+        return $this->sessionInstance;
     }
 
     /**
