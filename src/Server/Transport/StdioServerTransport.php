@@ -92,6 +92,10 @@ class StdioServerTransport implements Transport
         $this->write = new Channel();
     }
 
+    /**
+     * 
+     * @return array<Channel>
+     */
     public function getStreams(): array
     {
         return [$this->read, $this->write];
@@ -134,6 +138,13 @@ class StdioServerTransport implements Transport
         }
 
         $this->flush();
+
+        if ($this->read->isAvailable()) {
+            $this->read->close();
+        }
+        if ($this->write->isAvailable()) {
+            $this->write->close();
+        }
         $this->isStarted = false;
     }
 
@@ -336,7 +347,8 @@ class StdioServerTransport implements Transport
      *
      * @throws RuntimeException If writing to STDOUT fails.
      */
-    public function flush(): void {
+    public function flush(): void
+    {
         if (!$this->isStarted) {
             return;
         }
@@ -378,7 +390,8 @@ class StdioServerTransport implements Transport
      *
      * @return self
      */
-    public static function create($stdin = null, $stdout = null): self {
+    public static function create($stdin = null, $stdout = null): self
+    {
         return new self($stdin, $stdout);
     }
 }
