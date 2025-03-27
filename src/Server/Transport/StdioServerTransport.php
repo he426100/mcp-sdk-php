@@ -91,6 +91,10 @@ class StdioServerTransport implements Transport
         $this->write = new Channel(1);
     }
 
+    /**
+     * 
+     * @return array<Channel>
+     */
     public function getStreams(): array
     {
         return [$this->read, $this->write];
@@ -133,6 +137,13 @@ class StdioServerTransport implements Transport
         }
 
         $this->flush();
+
+        if ($this->read) {
+            $this->read->close();
+        }
+        if ($this->write) {
+            $this->write->close();
+        }
         $this->isStarted = false;
     }
 

@@ -59,6 +59,8 @@ class ServerRunner
 {
     private ?barrier $waitRef = null;
     private Channel $controlSignal;
+    /** @var array<int> */
+    private array $coroutines = [];
 
     private const MAX_SELECT_TIMOUT_US = 800000;
     private ?Transport $transportInstance = null;
@@ -97,12 +99,13 @@ class ServerRunner
                 }
 
                 // 监听控制信号
-                $this->spawnCoroutine(function (): void {
+                Coroutine::create(function (): void {
                     $signal = $this->controlSignal->pop();
                     if ($signal === 'shutdown') {
                         $this->logger->info('Received shutdown signal, stopping server...');
                         // 关闭组件
-                        $this->stopComponents();
+                        $this->shutdownServerInstances();
+                        $this->killAllCoroutines();
                     }
                 });
 
@@ -113,7 +116,7 @@ class ServerRunner
                 $this->logger->error('Server error: ' . $e->getMessage());
                 throw $e;
             } finally {
-                $this->stopComponents();
+                $this->shutdownServerInstances();
             }
         });
     }
@@ -335,13 +338,15 @@ class ServerRunner
      */
     private function spawnCoroutine(callable $callback): int
     {
-        return Coroutine::create($callback, $this->waitRef);
+        $coroutineId =  Coroutine::create($callback, $this->waitRef);
+        $this->coroutines[] = $coroutineId;
+        return $coroutineId;
     }
 
     /**
      * 停止所有组件
      */
-    private function stopComponents(): void
+    private function shutdownServerInstances(): void
     {
         if ($this->transportInstance) {
             $this->transportInstance->stop();
@@ -350,6 +355,35 @@ class ServerRunner
         if ($this->sessionInstance) {
             $this->sessionInstance->stop();
         }
+    }
+
+    /**
+     * 终止所有运行中的协程
+     */
+    private function killAllCoroutines(): void
+    {
+        foreach ($this->coroutines as $cid) {
+            Coroutine::cancel($cid);
+        }
+    }
+
+    /**
+     * 
+     * @return Transport 
+     */
+    public function getTransport(): Transport
+    {
+        return $this->transportInstance;
+    }
+
+
+    /**
+     * 
+     * @return ServerSession 
+     */
+    public function getSession(): ServerSession
+    {
+        return $this->sessionInstance;
     }
 
     /**

@@ -1,19 +1,3 @@
-# Model Context Protocol SDK for PHP
-
-This package provides a PHP implementation of the [Model Context Protocol](https://modelcontextprotocol.io), allowing applications to provide context for LLMs in a standardized way. It separates the concerns of providing context from the actual LLM interaction.
-
-## Overview
-
-This PHP SDK implements the full MCP specification, making it easy to:
-* Build MCP clients that can connect to any MCP server
-* Create MCP servers that expose resources, prompts and tools
-* Use standard transports like stdio and SSE
-* Handle all MCP protocol messages and lifecycle events
-
-Based on the official [Python SDK](https://github.com/modelcontextprotocol/python-sdk) for the Model Context Protocol.
-
-This SDK is primarily targeted at developers working on frontier AI integration solutions. Some functionality may be incomplete and implementations should undergo thorough testing and security review by experienced developers prior to production use.
-
 ## Installation
 
 You can install the package via composer:
@@ -26,6 +10,7 @@ composer require he426100/mcp-sdk-php
 * PHP 8.1 or higher
 * ext-curl
 * ext-pcntl (optional, recommended for CLI environments)
+* ext-swow (for sse and websocket transport)
 
 ## Basic Usage
 
@@ -115,17 +100,53 @@ $runner->run($server, $initOptions);
 
 Save this as `example_server.php`
 
+### Using Annotations (Alternative Approach)
+
+
+```php
+<?php
+
+require 'vendor/autoload.php';
+
+use Mcp\Server\Server;
+use Mcp\Server\ServerRunner;
+use Mcp\Annotation\Prompt;
+use Mcp\Tool\McpHandlerRegistrar;
+
+$server = new Server('example-server');
+
+// Define the prompt handling class using annotations
+class ExamplePrompts 
+{
+    #[Prompt(
+        name: 'example-prompt',
+        description: 'An example prompt template',
+        arguments: [
+            'arg1' => [
+                'description' => 'Example argument',
+                'required' => true
+            ]
+        ]
+    )]
+    public function generatePrompt(string $arg1): string
+    {
+        return "Example prompt text with argument: $arg1";
+    }
+}
+
+// Register annotation processor
+(new McpHandlerRegistrar)->registerHandler($server, new ExamplePrompts());
+
+// Create initialization options and run server
+$initOptions = $server->createInitializationOptions();
+$runner = new ServerRunner();
+$runner->run($server, $initOptions);
+```
+
 ## Sample Project
 
-### MySQL MCP Server
-
-[MySQL MCP Server](https://github.com/he426100/mysql-mcp-server) is an example of an MCP server implemented based on this SDK. It allows AI assistants to interact securely with MySQL databases through controlled interfaces. The server implements the following functions:
-
-- List MySQL tables as resources
-- Read table contents
-- Execute SQL queries and perform appropriate error handling
-- Configure secure database access through environment variables
-- Complete logging
+- [php-mcp-server](https://github.com/he426100/php-mcp-server)
+- [mysql-mcp-server](https://github.com/he426100/mysql-mcp-server)  
 
 
 ## Documentation

@@ -45,7 +45,6 @@ use Mcp\Types\Result;
 use Mcp\Types\Meta;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
-use Swoole\Coroutine;
 use Swoole\Coroutine\Channel;
 use Swoole\Http\Response;
 use RuntimeException;
