@@ -178,6 +178,11 @@ class McpHandlerRegistrar
                 $method = $this->getCachedMethod($reflectionClass, $methodName);
                 $result = $this->executeMethodSafely($method, $arguments, $handler);
 
+                // 检查是否已经是 CallToolResult 类型
+                if ($result instanceof CallToolResult) {
+                    return $result;
+                }
+
                 $content = $this->processToolResult($result);
                 return new CallToolResult(content: $content);
             } catch (\Throwable $e) {
@@ -307,6 +312,11 @@ class McpHandlerRegistrar
             try {
                 $method = $this->getCachedMethod($reflectionClass, $methodName);
                 $result = $this->executeMethodSafely($method, $arguments, $handler);
+
+                // 检查是否已经是 GetPromptResult 类型
+                if ($result instanceof GetPromptResult) {
+                    return $result;
+                }
 
                 // 找到对应的prompt定义以获取描述
                 $promptDescription = '';
@@ -452,6 +462,11 @@ class McpHandlerRegistrar
             try {
                 $method = $this->getCachedMethod($reflectionClass, $methodName);
                 $result = $this->executeMethodSafely($method, [], $handler);
+
+                // 检查是否已经是 ReadResourceResult 类型
+                if ($result instanceof ReadResourceResult) {
+                    return $result;
+                }
 
                 $resourceContents = $this->processResourceResult($result, $mimeType, $uri);
                 return new ReadResourceResult(
