@@ -317,19 +317,91 @@ class McpHandlerRegistrar
                     }
                 }
 
+                $messages = $this->processPromptResult($result);
                 return new GetPromptResult(
-                    messages: [
-                        new PromptMessage(
-                            role: Role::ASSISTANT,
-                            content: new TextContent(text: (string)$result)
-                        )
-                    ],
+                    messages: $messages,
                     description: $promptDescription
                 );
             } catch (\Throwable $e) {
                 throw new \InvalidArgumentException("Error processing prompt: " . $e->getMessage(), 0, $e);
             }
         });
+    }
+
+    /**
+     * 处理提示模板返回值，转换为适当的消息格式
+     *
+     * @param mixed $result 提示模板方法的返回值
+     * @return array<PromptMessage> 消息数组
+     */
+    private function processPromptResult(mixed $result): array
+    {
+        // 如果已经是PromptMessage数组，直接返回
+        if (is_array($result) && !empty($result) && $this->isPromptMessageArray($result)) {
+            return $result;
+        }
+
+        // 如果是单个PromptMessage对象，包装成数组
+        if ($result instanceof PromptMessage) {
+            return [$result];
+        }
+
+        // 如果是Content对象，创建用户消息
+        if ($this->isContentObject($result)) {
+            return [new PromptMessage(
+                role: Role::USER,
+                content: $result
+            )];
+        }
+
+        // 如果是字符串或其他标量类型，转换为TextContent的用户消息
+        if (is_scalar($result) || (is_object($result) && method_exists($result, '__toString'))) {
+            return [new PromptMessage(
+                role: Role::USER,
+                content: new TextContent(text: (string)$result)
+            )];
+        }
+
+        // 如果是null，返回空消息
+        if ($result === null) {
+            return [new PromptMessage(
+                role: Role::USER,
+                content: new TextContent(text: '')
+            )];
+        }
+
+        // 如果是数组或对象，转换为JSON字符串
+        if (is_array($result) || is_object($result)) {
+            return [new PromptMessage(
+                role: Role::USER,
+                content: new TextContent(text: json_encode(
+                    $result,
+                    JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
+                ))
+            )];
+        }
+
+        // 其他情况，转换为字符串
+        return [new PromptMessage(
+            role: Role::USER,
+            content: new TextContent(text: var_export($result, true))
+        )];
+    }
+
+    /**
+     * 检查是否为PromptMessage对象数组
+     *
+     * @param array $array 要检查的数组
+     * @return bool
+     */
+    private function isPromptMessageArray(array $array): bool
+    {
+        foreach ($array as $item) {
+            if (!($item instanceof PromptMessage)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**
@@ -379,17 +451,78 @@ class McpHandlerRegistrar
 
             try {
                 $method = $this->getCachedMethod($reflectionClass, $methodName);
-                $content = $this->executeMethodSafely($method, [], $handler);
+                $result = $this->executeMethodSafely($method, [], $handler);
 
+                $resourceContents = $this->processResourceResult($result, $mimeType, $uri);
                 return new ReadResourceResult(
-                    contents: [
-                        $this->processResourceContent((string)$content, $mimeType, $uri)
-                    ]
+                    contents: $resourceContents 
                 );
             } catch (\Throwable $e) {
                 throw new \InvalidArgumentException("Error reading resource: " . $e->getMessage(), 0, $e);
             }
         });
+    }
+
+    /**
+     * 处理资源返回值，转换为适当的资源内容格式
+     *
+     * @param mixed $result 资源方法的返回值
+     * @param string $mimeType MIME类型
+     * @param string $uri 资源URI
+     * @return array<ResourceContents> 资源内容数组
+     */
+    private function processResourceResult(mixed $result, string $mimeType, string $uri): array
+    {
+        // 如果已经是ResourceContents数组，直接返回
+        if (is_array($result) && !empty($result) && $this->isResourceContentsArray($result)) {
+            return $result;
+        }
+
+        // 如果是单个ResourceContents对象，包装成数组
+        if ($result instanceof ResourceContents) {
+            return [$result];
+        }
+
+        // 处理字符串或可转换为字符串的对象
+        if (is_scalar($result) || (is_object($result) && method_exists($result, '__toString'))) {
+            $content = (string)$result;
+            return [$this->processResourceContent($content, $mimeType, $uri)];
+        }
+
+        // 处理null值
+        if ($result === null) {
+            return [new TextResourceContents(
+                uri: $uri,
+                text: '',
+                mimeType: $mimeType
+            )];
+        }
+
+        // 处理数组或对象
+        if (is_array($result) || is_object($result)) {
+            $content = json_encode($result, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            return [$this->processResourceContent($content, 'application/json', $uri)];
+        }
+
+        // 默认情况
+        $content = var_export($result, true);
+        return [$this->processResourceContent($content, 'text/plain', $uri)];
+    }
+
+    /**
+     * 检查是否为ResourceContents对象数组
+     *
+     * @param array $array 要检查的数组
+     * @return bool
+     */
+    private function isResourceContentsArray(array $array): bool
+    {
+        foreach ($array as $item) {
+            if (!($item instanceof ResourceContents)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**
