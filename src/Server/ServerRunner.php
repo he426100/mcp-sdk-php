@@ -48,6 +48,8 @@ use RuntimeException;
 use Swow\Channel;
 use Swow\Sync\WaitReference;
 use Psr\Log\NullLogger;
+use Mcp\Server\Http\HttpServerFactory;
+use Mcp\Server\Http\ResponseEmitterInterface;
 
 /**
  * Main entry point for running an MCP server synchronously using STDIO transport.
@@ -290,47 +292,19 @@ class ServerRunner
 
             // 启动HTTP服务器
             $this->spawnCoroutine(function () use ($transport): void {
-                // 设置HTTP服务器
-                $httpServer = new EventDriver(new Psr7Server());
-                $httpServer->withRequestHandler(function (ServerConnection $connection, HttpRequest $request) use ($transport): void {
-                    $uri = $request->getUri()->getPath();
+                $httpServer = HttpServerFactory::create('auto', $this->logger);
 
-                    try {
-                        if ($uri == '/sse') {
-                            // 处理SSE连接请求
-                            $transport->handleSseRequest($connection);
-                        } elseif ($uri == '/messages') {
-                            // 处理POST消息请求
-                            $sessionId = (string)$request->getQueryParams()['session_id'];
-                            $transport->handlePostRequest($sessionId, (string)$request->getBody());
-                            $connection->respond([
-                                'Content-Type' => 'application/json',
-                            ], json_encode(['success' => true]));
-                        } else {
-                            // 处理404
-                            $connection->respond([
-                                'Content-Type' => 'application/json',
-                                'Status' => 404,
-                            ], json_encode(['error' => 'Not found']));
-                        }
-                    } catch (\Exception $e) {
-                        // 处理错误
-                        $connection->respond([
-                            'Content-Type' => 'application/json',
-                            'Status' => 500,
-                        ], json_encode(['error' => $e->getMessage()]));
-                        $this->logger->error('HTTP request error: ' . $e->getMessage());
-                    }
-                })->withExceptionHandler(function (ServerConnection $connection, \Exception $e) {
-                    $this->logger->error('HTTP server error: ' . $e->getMessage());
-                    $connection->respond([
-                        'Content-Type' => 'application/json',
-                        'Status' => 500,
-                    ], json_encode(['error' => 'Server error']));
-                })->startOn($this->host, $this->port);
+                $httpServer->withSseHandler(function (ResponseEmitterInterface $emitter) use ($transport) {
+                    $transport->handleSseRequest($emitter);
+                });
+
+                $httpServer->withMessagesHandler(function (string $sessionId, string $content) use ($transport) {
+                    $transport->handlePostRequest($sessionId, $content);
+                    return json_encode(['success' => true]);
+                });
+                $httpServer->start($this->host, $this->port);
+                $this->logger->info("SSE server started on http://{$this->host}:{$this->port}/sse");
             });
-
-            $this->logger->info("SSE server started on http://{$this->host}:{$this->port}/sse");
         } catch (\Throwable $e) {
             $this->logger->error('SSE server initialization error: ' . $e->getMessage());
             $this->controlSignal->push('shutdown');

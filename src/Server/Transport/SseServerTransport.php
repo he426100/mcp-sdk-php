@@ -43,10 +43,10 @@ use Mcp\Types\RequestParams;
 use Mcp\Types\NotificationParams;
 use Mcp\Types\Result;
 use Mcp\Types\Meta;
+use Mcp\Server\Http\ResponseEmitterInterface;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Swow\Channel;
-use Swow\Psr7\Server\ServerConnection;
 use RuntimeException;
 use InvalidArgumentException;
 
@@ -60,7 +60,7 @@ use InvalidArgumentException;
  */
 class SseServerTransport implements Transport
 {
-    /** @var array<string, array{created: int, lastSeen: int, output: ServerConnection}> */
+    /** @var array<string, array{created: int, lastSeen: int, output: ResponseEmitterInterface}> */
     private array $sessions = [];
     /** @var BaseSession|null */
     private ?BaseSession $session = null;
@@ -141,14 +141,13 @@ class SseServerTransport implements Transport
     /**
      * Handles the initial SSE connection from a client.
      *
-     * @param ServerConnection $output An output stream resource to write SSE events to.
+     * @param ResponseEmitterInterface $emitter 响应发送器实例
      *
      * @return string The generated session ID for this connection.
      *
-     * @throws InvalidArgumentException If the output is not a valid resource.
-     * @throws RuntimeException         If the transport is not started.
+     * @throws RuntimeException If the transport is not started.
      */
-    public function handleSseRequest(ServerConnection $output): string
+    public function handleSseRequest(ResponseEmitterInterface $emitter): string
     {
         if (!$this->isStarted) {
             throw new RuntimeException('Transport not started');
@@ -160,18 +159,10 @@ class SseServerTransport implements Transport
         $this->sessions[$sessionId] = [
             'created' => $currentTime,
             'lastSeen' => $currentTime,
-            'output' => $output,
+            'output' => $emitter,
         ];
 
-        // Set SSE headers (assuming this method is called before headers are sent)
-        $output->respond([
-            'Cache-Control' => 'no-cache',
-            'Content-Type' => 'text/event-stream',
-            'Content-Length' => null,
-            'Connection' => 'keep-alive',
-            'X-Accel-Buffering' => 'no', // Disable response buffering
-        ]);
-
+        $emitter->sendSseHeaders();
         // Send initial event with endpoint information
         $this->sendSseEvent($sessionId, 'endpoint', "{$this->endpoint}?session_id={$sessionId}");
 
@@ -186,8 +177,8 @@ class SseServerTransport implements Transport
      * @param string $sessionId The session ID provided by the client as a query parameter.
      * @param string $content   The JSON content from the POST body.
      *
-     * @throws McpError              If parsing or validation fails.
-     * @throws RuntimeException       If the transport is not started or the session is invalid.
+     * @throws McpError       If parsing or validation fails.
+     * @throws RuntimeException If the transport is not started or the session is invalid.
      *
      * @return void
      */
@@ -407,19 +398,15 @@ class SseServerTransport implements Transport
             return;
         }
 
-        $output = $this->sessions[$sessionId]['output'];
+        $emitter = $this->sessions[$sessionId]['output'];
 
-        $sseData = "event: {$event}\ndata: {$data}\n\n";
-
-        try {
-            $output->send($sseData);
-        } catch (\Exception $e) {
+        if (!$emitter->sendEvent($event, $data)) {
             $this->logger->error("Failed to write SSE event to session: $sessionId");
+            $emitter->close();
             unset($this->sessions[$sessionId]);
-            return;
+        } else {
+            $this->logger->debug("Sent SSE event '{$event}' to session: $sessionId");
         }
-
-        $this->logger->debug("Sent SSE event '{$event}' to session: $sessionId");
     }
 
     /**
