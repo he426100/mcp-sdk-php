@@ -32,7 +32,7 @@ class HttpServerFactory
 
         return match ($engine) {
             'swow' => new SwowHttpServer($logger),
-            'swoole' => throw new InvalidArgumentException('Swoole HTTP server is not implemented yet'),
+            'swoole' => new SwooleHttpServer($logger),
             default => throw new InvalidArgumentException("Unsupported HTTP server engine: {$engine}"),
         };
     }
