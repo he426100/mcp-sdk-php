@@ -53,14 +53,6 @@ class Coroutine implements CoroutineInterface
     /**
      * @inheritDoc
      */
-    public function isExecuting(): bool
-    {
-        return $this->driver->isExecuting();
-    }
-
-    /**
-     * @inheritDoc
-     */
     public function kill(): void
     {
         $this->driver->kill();

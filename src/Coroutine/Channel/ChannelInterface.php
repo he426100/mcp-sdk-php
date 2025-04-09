@@ -27,14 +27,6 @@ interface ChannelInterface
      */
     public function pop(float $timeout = -1): mixed;
 
-
-    /**
-     *
-     * @return bool
-     */
-    public function isAvailable(): bool;
-
-
     /**
      * Close the channel.
      *

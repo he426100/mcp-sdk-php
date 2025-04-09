@@ -29,12 +29,6 @@ interface CoroutineInterface
 
     /**
      * 
-     * @return bool 
-     */
-    public function isExecuting(): bool;
-
-    /**
-     * 
      * @return void 
      */
     public function kill(): void;

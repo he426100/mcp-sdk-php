@@ -341,8 +341,10 @@ class ServerRunner
     private function killAllCoroutines(): void
     {
         foreach ($this->coroutines as $coroutine) {
-            if ($coroutine->isExecuting()) {
+            try {
                 $coroutine->kill();
+            } catch (\Throwable $e) {
+                $this->logger->error('Error killing coroutine: ' . $e->getMessage());
             }
         }
     }
@@ -355,7 +357,6 @@ class ServerRunner
     {
         return $this->transportInstance;
     }
-
 
     /**
      * 

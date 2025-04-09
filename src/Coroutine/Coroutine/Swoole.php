@@ -36,15 +36,6 @@ class Swoole implements CoroutineInterface
      * 
      * @inheritDoc
      */
-    public function isExecuting(): bool
-    {
-        return true;
-    }
-
-    /**
-     * 
-     * @inheritDoc
-     */
     public function kill(): void
     {
         Coroutine::cancel($this->id);

@@ -56,14 +56,6 @@ class Channel implements ChannelInterface
     /**
      * @inheritDoc
      */
-    public function isAvailable(): bool
-    {
-        return $this->driver->isAvailable();
-    }
-
-    /**
-     * @inheritDoc
-     */
     public function close(): void
     {
         $this->driver->close();

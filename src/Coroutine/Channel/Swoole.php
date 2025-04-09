@@ -46,14 +46,6 @@ class Swoole implements ChannelInterface
     /**
      * @inheritDoc
      */
-    public function isAvailable(): bool
-    {
-        return true;
-    }
-
-    /**
-     * @inheritDoc
-     */
     public function close(): void
     {
         $this->channel->close();

@@ -56,16 +56,10 @@ class Swow implements ChannelInterface
     /**
      * @inheritDoc
      */
-    public function isAvailable(): bool
-    {
-        return $this->channel->isAvailable();
-    }
-
-    /**
-     * @inheritDoc
-     */
     public function close(): void
     {
-        $this->channel->close();
+        if ($this->channel->isAvailable()) {
+            $this->channel->close();
+        }
     }
 }

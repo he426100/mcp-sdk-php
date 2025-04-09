@@ -141,10 +141,10 @@ class StdioServerTransport implements Transport
 
         $this->flush();
 
-        if ($this->read->isAvailable()) {
+        if ($this->read) {
             $this->read->close();
         }
-        if ($this->write->isAvailable()) {
+        if ($this->write) {
             $this->write->close();
         }
         $this->isStarted = false;
