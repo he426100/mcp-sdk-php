@@ -50,7 +50,8 @@ use Ratchet\ConnectionInterface;
 use Ratchet\WebSocket\WsServerInterface;
 use RuntimeException;
 use InvalidArgumentException;
-use Swow\Channel;
+use Mcp\Coroutine\Channel;
+use Mcp\Coroutine\Channel\ChannelInterface;
 
 /**
  * Class WebSocketServerTransport
@@ -76,10 +77,10 @@ class WebSocketServerTransport implements Transport, MessageComponentInterface, 
     private LoggerInterface $logger;
 
     /** @var Channel */
-    private Channel $read;
+    private ChannelInterface $read;
 
     /** @var Channel */
-    private Channel $write;
+    private ChannelInterface $write;
 
     /**
      * WebSocketServerTransport constructor.
@@ -97,7 +98,7 @@ class WebSocketServerTransport implements Transport, MessageComponentInterface, 
     /**
      * Returns the read and write channels used for message passing.
      *
-     * @return array{Channel, Channel} Array containing [read channel, write channel]
+     * @return array{ChannelInterface, ChannelInterface} Array containing [read channel, write channel]
      */
     public function getStreams(): array
     {

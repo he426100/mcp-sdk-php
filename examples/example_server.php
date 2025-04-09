@@ -111,14 +111,24 @@ $server->registerHandler('prompts/get', function (GetPromptRequestParams $params
 $initOptions = $server->createInitializationOptions();
 $runner = new ServerRunner($logger);
 
-Coroutine::run(function () use ($logger, $runner): void {
-    Signal::wait(Signal::INT);
-    $runner->shutdown();
-});
+$start = function () use ($runner, $server, $initOptions, $logger) {
+    try {
+        $runner->run($server, $initOptions);
+    } catch (\Throwable $e) {
+        echo "An error occurred: " . $e->getMessage() . "\n";
+        $logger->error("Server run failed", ['exception' => $e]);
+    }
+};
 
-try {
-    $runner->run($server, $initOptions);
-} catch (\Throwable $e) {
-    echo "An error occurred: " . $e->getMessage() . "\n";
-    $logger->error("Server run failed", ['exception' => $e]);
+if (extension_loaded('swoole')) {
+    \Swoole\Coroutine\run(function () use ($start) {
+        $start();
+    });
+} else {
+    Coroutine::run(function () use ($logger, $runner): void {
+        Signal::wait(Signal::INT);
+        $runner->shutdown();
+    });
+
+    $start();
 }

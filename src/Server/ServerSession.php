@@ -49,7 +49,7 @@ use Mcp\Types\JSONRPCNotification;
 use Mcp\Types\NotificationParams;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
-use Swow\Channel;
+use Mcp\Coroutine\Channel\ChannelInterface;
 use RuntimeException;
 use InvalidArgumentException;
 
@@ -71,8 +71,8 @@ class ServerSession extends BaseSession
     private array $notificationMethodHandlers = [];
 
     public function __construct(
-        private readonly Channel $read,
-        private readonly Channel $write,
+        private readonly ChannelInterface $read,
+        private readonly ChannelInterface $write,
         private readonly InitializationOptions $initOptions,
         ?LoggerInterface $logger = null
     ) {

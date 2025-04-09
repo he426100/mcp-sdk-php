@@ -15,7 +15,8 @@
         "cboden/ratchet": "^0.4",
         "monolog/monolog": "^3.0",
         "symfony/console": "^6.4",
-        "swow/swow": "^1.5"
+        "swow/swow": "^1.5",
+        "swoole/ide-helper": "^6.0"
     },
     "suggest": {
         "ext-pcntl": "For better process handling in CLI environments"

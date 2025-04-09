@@ -28,6 +28,8 @@ declare(strict_types=1);
 
 namespace Mcp\Server\Transport;
 
+use Mcp\Coroutine\Channel\ChannelInterface;
+
 /**
  * Base interface for MCP transport implementations
  */
@@ -53,7 +55,7 @@ interface Transport
 
     /**
      * 
-     * @return array 
+     * @return array{ChannelInterface, ChannelInterface}
      */
     public function getStreams(): array;   
 }

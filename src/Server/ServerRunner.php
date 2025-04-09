@@ -39,14 +39,11 @@ use Mcp\Shared\BaseSession;
 use Mcp\Types\ServerCapabilities;
 use Psr\Log\LoggerInterface;
 use Psr\Log\LogLevel;
-use Swow\Coroutine;
-use Swow\Psr7\Message\ServerRequest as HttpRequest;
-use Swow\Psr7\Server\EventDriver;
-use Swow\Psr7\Server\Server as Psr7Server;
-use Swow\Psr7\Server\ServerConnection;
+use Mcp\Coroutine\Coroutine;
+use Mcp\Coroutine\Coroutine\CoroutineInterface;
 use RuntimeException;
-use Swow\Channel;
-use Swow\Sync\WaitReference;
+use Mcp\Coroutine\Channel;
+use Mcp\Coroutine\Barrier;
 use Psr\Log\NullLogger;
 use Mcp\Server\Http\HttpServerFactory;
 use Mcp\Server\Http\ResponseEmitterInterface;
@@ -59,9 +56,9 @@ use Mcp\Server\Http\ResponseEmitterInterface;
  */
 class ServerRunner
 {
-    private ?WaitReference $waitRef = null;
+    private ?object $waitRef = null;
     private Channel $controlSignal;
-    /** @var array<coroutine> */
+    /** @var array<CoroutineInterface> */
     private array $coroutines = [];
 
     private const MAX_SELECT_TIMOUT_US = 800000;
@@ -89,9 +86,11 @@ class ServerRunner
         }
 
         // 创建WaitReference
-        $this->waitRef = new WaitReference();
+        $this->waitRef = Barrier::create();
 
         try {
+            Coroutine::init();
+            
             // 选择运行模式
             if ($this->transport == 'sse') {
                 $this->runSseServer($server, $initOptions);
@@ -100,7 +99,7 @@ class ServerRunner
             }
 
             // 监听控制信号
-            Coroutine::run(function (): void {
+            Coroutine::create(function (): void {
                 $signal = $this->controlSignal->pop();
                 if ($signal === 'shutdown') {
                     $this->logger->info('Received shutdown signal, stopping server...');
@@ -111,7 +110,7 @@ class ServerRunner
             });
 
             // 等待所有协程完成
-            WaitReference::wait($this->waitRef);
+            Barrier::wait($this->waitRef);
             $this->logger->info('Server stopped');
         } catch (\Throwable $e) {
             $this->logger->error('Server error: ' . $e->getMessage());
@@ -317,9 +316,9 @@ class ServerRunner
      */
     private function spawnCoroutine(callable $callback): int
     {
-        $coroutine = Coroutine::run($callback, $this->waitRef);
+        $coroutine = Coroutine::create($callback, $this->waitRef);
         $this->coroutines[] = $coroutine;
-        return $coroutine->getId();
+        return $coroutine->id();
     }
 
     /**
