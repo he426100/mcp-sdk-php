@@ -32,14 +32,15 @@ class SwowHttpServer extends AbstractHttpServer
 
         $httpServer = new EventDriver(new Psr7Server());
 
-        $httpServer->withRequestHandler(function (ServerConnection $connection, ServerRequestPlusInterface $request): mixed {
+        $httpServer = $httpServer->withRequestHandler(function (ServerConnection $connection, ServerRequestPlusInterface $request): mixed {
             $uri = $request->getUri()->getPath();
 
             try {
                 if ($uri == '/sse') {
                     $sseHandler = $this->sseHandler;
                     $emitter = new SwowResponseEmitter($connection);
-                    return $sseHandler($emitter, $request);
+                    $sseHandler($emitter, $request);
+                    return null;
                 } elseif ($uri == '/messages') {
                     $messagesHandler = $this->messagesHandler;
                     $sessionId = (string)($request->getQueryParams()['session_id'] ?? '');

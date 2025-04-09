@@ -31,10 +31,10 @@ class SwowResponseEmitter implements ResponseEmitterInterface
         $this->connection->respond([
             'Cache-Control' => 'no-cache',
             'Content-Type' => 'text/event-stream',
-            'Content-Length' => '0',
+            'Content-Length' => null,
             'Connection' => 'keep-alive',
-            'X-Accel-Buffering' => 'no', // 禁用响应缓冲
-        ]);
+            'X-Accel-Buffering' => 'no', // Disable response buffering
+        ]);;
     }
 
     /**
