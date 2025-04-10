@@ -1,29 +1,29 @@
-中文 | [English](README.en.md)
+English | [中文](README.md)
 
-## 安装
+## Installation
 
-您可以通过 composer 安装此包：
+You can install the package via composer:
 
 ```bash
 composer require he426100/mcp-sdk-php
 ```
 
-### 要求
-* PHP 8.1 或更高版本
+### Requirements
+* PHP 8.1 or higher
 * ext-curl
-* ext-pcntl (可选，在 CLI 环境中推荐使用)
-* [ext-swow](https://github.com/swow/swow) 或 [ext-swoole](https://github.com/swoole/swoole-src) (用于 sse 和 websocket 传输)
+* ext-pcntl (optional, recommended for CLI environments)
+* [ext-swow](https://github.com/swow/swow) or [ext-swoole](https://github.com/swoole/swoole-src) (for sse and websocket transport)
 
-## 基本用法
+## Basic Usage
 
-### 创建 MCP 服务器
+### Creating an MCP Server
 
-以下是创建提供 prompts 的 MCP 服务器的完整示例：
+Here's a complete example of creating an MCP server that provides prompts:
 
 ```php
 <?php
 
-// 一个带有测试用 prompts 列表的基本示例服务器
+// A basic example server with a list of prompts for testing
 
 require 'vendor/autoload.php';
 
@@ -38,10 +38,10 @@ use Mcp\Types\Role;
 use Mcp\Types\GetPromptResult;
 use Mcp\Types\GetPromptRequestParams;
 
-// 创建服务器实例
+// Create a server instance
 $server = new Server('example-server');
 
-// 注册 prompt 处理器
+// Register prompt handlers
 $server->registerHandler('prompts/list', function($params) {
     $prompt = new Prompt(
         name: 'example-prompt',
@@ -66,7 +66,7 @@ $server->registerHandler('prompts/get', function(GetPromptRequestParams $params)
         throw new \InvalidArgumentException("Unknown prompt: {$name}");
     }
 
-    // 安全获取参数值
+    // Get argument value safely
     $argValue = $arguments ? $arguments->arg1 : 'none';
 
     $prompt = new Prompt(
@@ -94,15 +94,15 @@ $server->registerHandler('prompts/get', function(GetPromptRequestParams $params)
     );
 });
 
-// 创建初始化选项并运行服务器
+// Create initialization options and run server
 $initOptions = $server->createInitializationOptions();
 $runner = new ServerRunner();
 $runner->run($server, $initOptions);
 ```
 
-将此代码保存为 `example_server.php`
+Save this as `example_server.php`
 
-### 使用注解
+### Using Annotations
 
 
 ```php
@@ -117,7 +117,7 @@ use Mcp\Tool\McpHandlerRegistrar;
 
 $server = new Server('example-server');
 
-// 使用注解定义处理 prompt 的类
+// Define the prompt handling class using annotations
 class ExamplePrompts 
 {
     #[Prompt(
@@ -136,35 +136,35 @@ class ExamplePrompts
     }
 }
 
-// 注册注解处理器
+// Register annotation processor
 (new McpHandlerRegistrar)->registerHandler($server, new ExamplePrompts());
 
-// 创建初始化选项并运行服务器
+// Create initialization options and run server
 $initOptions = $server->createInitializationOptions();
 $runner = new ServerRunner();
 $runner->run($server, $initOptions);
 ```
 
-## 示例项目
+## Sample Project
 
 - [php-mcp-server](https://github.com/he426100/php-mcp-server)
 
 
-## 文档
+## Documentation
 
-有关 Model Context Protocol 的详细信息，请访问[官方文档](https://modelcontextprotocol.io)。
+For detailed information about the Model Context Protocol, visit the [official documentation](https://modelcontextprotocol.io).
 
-## 致谢
+## Credits
 
-这个 PHP SDK 由以下人员开发：
+This PHP SDK was developed by:
 - [Josh Abbott](https://joshabbott.com)
 - [he426100](https://github.com/he426100)
-- Claude 3.5 Sonnet (Anthropic AI 模型)
+- Claude 3.5 Sonnet (Anthropic AI model)
 
-附加调试和重构由 Josh Abbott 使用 OpenAI ChatGPT o1 专业模式完成。
+Additional debugging and refactoring done by Josh Abbott using OpenAI ChatGPT o1 pro mode.
 
-基于 Model Context Protocol 的原始 [Python SDK](https://github.com/modelcontextprotocol/python-sdk)。
+Based on the original [Python SDK](https://github.com/modelcontextprotocol/python-sdk) for the Model Context Protocol.
 
-## 许可证
+## License
 
-MIT 许可证 (MIT)。更多信息请查看[许可证文件](LICENSE)。
+The MIT License (MIT). Please see [License File](LICENSE) for more information. 
