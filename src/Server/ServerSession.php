@@ -43,13 +43,13 @@ use Mcp\Types\InitializeRequestParams;
 use Mcp\Types\Result;
 use Mcp\Server\InitializationState;
 use Mcp\Server\InitializationOptions;
-use Mcp\Server\Transport\Transport;
 use Mcp\Types\JSONRPCResponse;
 use Mcp\Types\JSONRPCError;
 use Mcp\Types\JSONRPCNotification;
 use Mcp\Types\NotificationParams;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
+use Mcp\Coroutine\Channel\ChannelInterface;
 use RuntimeException;
 use InvalidArgumentException;
 
@@ -71,7 +71,8 @@ class ServerSession extends BaseSession
     private array $notificationMethodHandlers = [];
 
     public function __construct(
-        private readonly Transport $transport,
+        private readonly ChannelInterface $read,
+        private readonly ChannelInterface $write,
         private readonly InitializationOptions $initOptions,
         ?LoggerInterface $logger = null
     ) {
@@ -96,7 +97,6 @@ class ServerSession extends BaseSession
             throw new RuntimeException('Session already initialized');
         }
 
-        $this->transport->start();
         $this->initialize();
     }
 
@@ -109,7 +109,6 @@ class ServerSession extends BaseSession
             return;
         }
 
-        $this->transport->stop();
         $this->close();
     }
 
@@ -143,7 +142,7 @@ class ServerSession extends BaseSession
             if ($clientCaps->experimental === null) {
                 return false;
             }
-            
+
             $expProps = get_object_vars($capability->experimental);
             foreach ($expProps as $key => $value) {
                 if (
@@ -372,7 +371,7 @@ class ServerSession extends BaseSession
     private function writeNotification(string $method, ?array $params = null): void
     {
         $notificationParams = $params !== null ? NotificationParams::fromArray($params) : null;
-        
+
         $jsonRpcNotification = new JSONRPCNotification(
             jsonrpc: '2.0',
             method: $method,
@@ -393,20 +392,14 @@ class ServerSession extends BaseSession
         // Start reading messages from the transport
         // This could be a loop or a separate thread in a real implementation
         // For demonstration, we'll use a simple loop
-        while ($this->isInitialized) {
-            $message = $this->readNextMessage();
-            $this->handleIncomingMessage($message);
-        }
     }
 
-    protected function stopMessageProcessing(): void
-    {
-    }
+    protected function stopMessageProcessing(): void {}
 
     protected function writeMessage(JsonRpcMessage $message): void
     {
         $this->logger->debug('writeMessage: ' . json_encode($message));
-        $this->transport->writeMessage($message);
+        $this->write->push($message);
     }
 
     protected function waitForResponse(int $requestIdValue, string $resultType, ?\Mcp\Types\McpModel &$futureResult): \Mcp\Types\McpModel
@@ -417,14 +410,30 @@ class ServerSession extends BaseSession
 
     protected function readNextMessage(): JsonRpcMessage
     {
-        while (true) {
-            $message = $this->transport->readMessage();
-            if ($message !== null) {
-                $this->logger->debug('readNextMessage: ' . json_encode($message));
-                return $message;
-            }
-            // Sleep briefly to avoid busy-waiting when no messages are available
-            usleep(10000);
+        $message = $this->read->pop();
+        $this->logger->debug('readNextMessage: ' . json_encode($message));
+        return $message;
+    }
+
+    /**
+     * Check if the session is started.
+     */
+    public function isStarted(): bool
+    {
+        return $this->isInitialized;
+    }
+
+    /**
+     * Process the next message in the session.
+     */
+    public function processNextMessage(): void
+    {
+        try {
+            $message = $this->readNextMessage();
+            $this->handleIncomingMessage($message);
+        } catch (\Exception $e) {
+            // 处理异常
+            throw new RuntimeException('Error processing message: ' . $e->getMessage(), 0, $e);
         }
     }
 }

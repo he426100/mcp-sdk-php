@@ -28,7 +28,7 @@ declare(strict_types=1);
 
 namespace Mcp\Server\Transport;
 
-use Mcp\Types\JsonRpcMessage;
+use Mcp\Coroutine\Channel\ChannelInterface;
 
 /**
  * Base interface for MCP transport implementations
@@ -48,18 +48,14 @@ interface Transport
     public function stop(): void;
 
     /**
-     * Read the next message from the transport
-     * 
-     * @return JsonRpcMessage|null Returns null when no message is available
-     * @throws \Exception if an error occurs while reading
+     * is transport started
+     * @return bool 
      */
-    public function readMessage(): ?JsonRpcMessage;
+    public function isStarted(): bool;
 
     /**
-     * Write a message to the transport
      * 
-     * @param JsonRpcMessage $message The message to write
-     * @throws \Exception if an error occurs while writing
+     * @return array{ChannelInterface, ChannelInterface}
      */
-    public function writeMessage(JsonRpcMessage $message): void;
+    public function getStreams(): array;   
 }

@@ -43,8 +43,11 @@ use Mcp\Types\RequestParams;
 use Mcp\Types\NotificationParams;
 use Mcp\Types\Result;
 use Mcp\Types\Meta;
+use Mcp\Server\Http\ResponseEmitterInterface;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
+use Mcp\Coroutine\Channel;
+use Mcp\Coroutine\Channel\ChannelInterface;
 use RuntimeException;
 use InvalidArgumentException;
 
@@ -56,9 +59,9 @@ use InvalidArgumentException;
  * This transport manages Server-Sent Events (SSE) connections, allowing the server
  * to push JSON-RPC messages to connected clients and handle incoming messages via POST requests.
  */
-class SseServerTransport implements Transport, SessionAwareTransport
+class SseServerTransport implements Transport
 {
-    /** @var array<string, array{created: int, lastSeen: int, output: resource}> */
+    /** @var array<string, array{created: int, lastSeen: int, output: ResponseEmitterInterface}> */
     private array $sessions = [];
     /** @var BaseSession|null */
     private ?BaseSession $session = null;
@@ -66,6 +69,10 @@ class SseServerTransport implements Transport, SessionAwareTransport
     private bool $isStarted = false;
     /** @var LoggerInterface */
     private LoggerInterface $logger;
+
+    /** 模拟python的read_stream和write_stream */
+    private ChannelInterface $read;
+    private ChannelInterface $write;
 
     /**
      * SseServerTransport constructor.
@@ -84,23 +91,31 @@ class SseServerTransport implements Transport, SessionAwareTransport
         }
 
         $this->logger = $logger ?? new NullLogger();
+
+        $this->read = new Channel();
+        $this->write = new Channel();
+    }
+
+    /**
+     * Returns the read and write channels used for message passing.
+     *
+     * @return array{ChannelInterface, ChannelInterface} Array containing [read channel, write channel]
+     */
+    public function getStreams(): array
+    {
+        return [$this->read, $this->write];
     }
 
     /**
      * Starts the SSE transport.
      *
-     * @throws RuntimeException If the transport is already started or if no session is attached.
-     *
+     * @throws RuntimeException If the transport is already started.
      * @return void
      */
     public function start(): void
     {
         if ($this->isStarted) {
             throw new RuntimeException('Transport already started');
-        }
-
-        if ($this->session === null) {
-            throw new RuntimeException('No session attached to transport');
         }
 
         $this->isStarted = true;
@@ -120,7 +135,7 @@ class SseServerTransport implements Transport, SessionAwareTransport
 
         // Close all SSE connections
         foreach ($this->sessions as $sessionId => $session) {
-            fclose($session['output']);
+            $session['output']->close();
             $this->logger->debug("Closed SSE connection: $sessionId");
         }
 
@@ -130,36 +145,18 @@ class SseServerTransport implements Transport, SessionAwareTransport
     }
 
     /**
-     * Attaches a session to the transport.
-     *
-     * @param BaseSession $session The session to attach.
-     *
-     * @return void
-     */
-    public function attachSession(BaseSession $session): void
-    {
-        $this->session = $session;
-        $this->logger->debug('Session attached to SSE transport');
-    }
-
-    /**
      * Handles the initial SSE connection from a client.
      *
-     * @param resource $output An output stream resource to write SSE events to.
+     * @param ResponseEmitterInterface $emitter 响应发送器实例
      *
      * @return string The generated session ID for this connection.
      *
-     * @throws InvalidArgumentException If the output is not a valid resource.
-     * @throws RuntimeException         If the transport is not started.
+     * @throws RuntimeException If the transport is not started.
      */
-    public function handleSseRequest($output): string
+    public function handleSseRequest(ResponseEmitterInterface $emitter): string
     {
         if (!$this->isStarted) {
             throw new RuntimeException('Transport not started');
-        }
-
-        if (!is_resource($output)) {
-            throw new InvalidArgumentException('Output must be a valid resource.');
         }
 
         $sessionId = bin2hex(random_bytes(16));
@@ -168,15 +165,10 @@ class SseServerTransport implements Transport, SessionAwareTransport
         $this->sessions[$sessionId] = [
             'created' => $currentTime,
             'lastSeen' => $currentTime,
-            'output' => $output,
+            'output' => $emitter,
         ];
 
-        // Set SSE headers (assuming this method is called before headers are sent)
-        header('Content-Type: text/event-stream');
-        header('Cache-Control: no-cache');
-        header('Connection: keep-alive');
-        header('X-Accel-Buffering: no'); // Disable response buffering
-
+        $emitter->sendSseHeaders();
         // Send initial event with endpoint information
         $this->sendSseEvent($sessionId, 'endpoint', "{$this->endpoint}?session_id={$sessionId}");
 
@@ -191,12 +183,12 @@ class SseServerTransport implements Transport, SessionAwareTransport
      * @param string $sessionId The session ID provided by the client as a query parameter.
      * @param string $content   The JSON content from the POST body.
      *
-     * @throws McpError              If parsing or validation fails.
-     * @throws RuntimeException       If the transport is not started or the session is invalid.
+     * @throws McpError       If parsing or validation fails.
+     * @throws RuntimeException If the transport is not started or the session is invalid.
      *
-     * @return JsonRpcMessage|null
+     * @return void
      */
-    public function handlePostRequest(string $sessionId, string $content): ?JsonRpcMessage
+    public function handlePostRequest(string $sessionId, string $content): void
     {
         if (!$this->isStarted) {
             throw new RuntimeException('Transport not started');
@@ -316,8 +308,7 @@ class SseServerTransport implements Transport, SessionAwareTransport
             $this->logger->debug("Received message from session $sessionId");
 
             // Pass message to the session
-            // TODO: 这里应该send吗？
-            return $message;
+            $this->read->push($message);
         } catch (McpError $e) {
             throw $e;
         } catch (\Exception $e) {
@@ -413,20 +404,15 @@ class SseServerTransport implements Transport, SessionAwareTransport
             return;
         }
 
-        $output = $this->sessions[$sessionId]['output'];
+        $emitter = $this->sessions[$sessionId]['output'];
 
-        $sseData = "event: {$event}\ndata: {$data}\n\n";
-
-        $bytesWritten = fwrite($output, $sseData);
-        if ($bytesWritten === false) {
+        if (!$emitter->sendEvent($event, $data)) {
             $this->logger->error("Failed to write SSE event to session: $sessionId");
-            // Optionally, handle the broken connection by removing the session
-            fclose($output);
+            $emitter->close();
             unset($this->sessions[$sessionId]);
-            return;
+        } else {
+            $this->logger->debug("Sent SSE event '{$event}' to session: $sessionId");
         }
-
-        $this->logger->debug("Sent SSE event '{$event}' to session: $sessionId");
     }
 
     /**
@@ -441,10 +427,18 @@ class SseServerTransport implements Transport, SessionAwareTransport
         $now = time();
         foreach ($this->sessions as $sessionId => $session) {
             if ($now - $session['lastSeen'] > $maxAge) {
-                fclose($session['output']);
+                $session['output']->close();
                 unset($this->sessions[$sessionId]);
                 $this->logger->debug("Cleaned up expired session: $sessionId");
             }
         }
+    }
+
+    /**
+     * 检查传输层是否已启动
+     */
+    public function isStarted(): bool
+    {
+        return $this->isStarted;
     }
 }

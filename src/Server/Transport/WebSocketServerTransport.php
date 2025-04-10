@@ -50,6 +50,8 @@ use Ratchet\ConnectionInterface;
 use Ratchet\WebSocket\WsServerInterface;
 use RuntimeException;
 use InvalidArgumentException;
+use Mcp\Coroutine\Channel;
+use Mcp\Coroutine\Channel\ChannelInterface;
 
 /**
  * Class WebSocketServerTransport
@@ -74,6 +76,12 @@ class WebSocketServerTransport implements Transport, MessageComponentInterface, 
     /** @var LoggerInterface */
     private LoggerInterface $logger;
 
+    /** @var Channel */
+    private ChannelInterface $read;
+
+    /** @var Channel */
+    private ChannelInterface $write;
+
     /**
      * WebSocketServerTransport constructor.
      *
@@ -83,6 +91,18 @@ class WebSocketServerTransport implements Transport, MessageComponentInterface, 
         ?LoggerInterface $logger = null
     ) {
         $this->logger = $logger ?? new NullLogger();
+        $this->read = new Channel();
+        $this->write = new Channel();
+    }
+
+    /**
+     * Returns the read and write channels used for message passing.
+     *
+     * @return array{ChannelInterface, ChannelInterface} Array containing [read channel, write channel]
+     */
+    public function getStreams(): array
+    {
+        return [$this->read, $this->write];
     }
 
     /**
@@ -123,6 +143,16 @@ class WebSocketServerTransport implements Transport, MessageComponentInterface, 
         $this->connections = [];
         $this->isStarted = false;
         $this->logger->debug('WebSocket transport stopped');
+    }
+
+    /**
+     * Checks if the transport is started.
+     *
+     * @return bool True if the transport is started, false otherwise.
+     */
+    public function isStarted(): bool
+    {
+        return $this->isStarted;
     }
 
     /**
@@ -189,8 +219,11 @@ class WebSocketServerTransport implements Transport, MessageComponentInterface, 
 
         try {
             $message = $this->buildMessage($data, $hasMethod, $hasId, $hasResult, $hasError, $id);
-
-            // TODO: 实现onMessage的处理
+            
+            // Push message to read channel for processing
+            $this->read->push($message);
+            
+            $this->logger->debug('Received WebSocket message');
         } catch (McpError $e) {
             // Send error response
             $error = $e->error;

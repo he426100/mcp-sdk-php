@@ -41,9 +41,10 @@ use Mcp\Types\JSONRPCError;
 use Mcp\Types\RequestParams;
 use Mcp\Types\NotificationParams;
 use Mcp\Types\Result;
-use Mcp\Types\Meta;
 use RuntimeException;
 use InvalidArgumentException;
+use Mcp\Coroutine\Channel;
+use Mcp\Coroutine\Channel\ChannelInterface;
 
 /**
  * Class StdioServerTransport
@@ -59,8 +60,12 @@ class StdioServerTransport implements Transport
     private $stdout;
     /** @var array<string> */
     private array $writeBuffer = [];
-    /** @var bool */
+
+    /** @var bool 是否已启动 */
     private bool $isStarted = false;
+
+    private ChannelInterface $read;
+    private ChannelInterface $write;
 
     /**
      * StdioServerTransport constructor.
@@ -83,6 +88,19 @@ class StdioServerTransport implements Transport
 
         $this->stdin = $stdin ?? STDIN;
         $this->stdout = $stdout ?? STDOUT;
+
+        $this->read = new Channel();
+        $this->write = new Channel();
+    }
+
+    /**
+     * Returns the read and write channels used for message passing.
+     *
+     * @return array{ChannelInterface, ChannelInterface} Array containing [read channel, write channel]
+     */
+    public function getStreams(): array
+    {
+        return [$this->read, $this->write];
     }
 
     /**
@@ -122,6 +140,13 @@ class StdioServerTransport implements Transport
         }
 
         $this->flush();
+
+        if ($this->read) {
+            $this->read->close();
+        }
+        if ($this->write) {
+            $this->write->close();
+        }
         $this->isStarted = false;
     }
 
@@ -347,6 +372,16 @@ class StdioServerTransport implements Transport
 
         // Ensure all buffered data is sent
         fflush($this->stdout);
+    }
+
+    /**
+     * Checks if the transport is started.
+     *
+     * @return bool True if the transport is started, false otherwise.
+     */
+    public function isStarted(): bool
+    {
+        return $this->isStarted;
     }
 
     /**

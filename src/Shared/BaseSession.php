@@ -104,8 +104,8 @@ abstract class BaseSession
         if (!$this->isInitialized) {
             return;
         }
-        $this->stopMessageProcessing();
         $this->isInitialized = false;
+        $this->stopMessageProcessing();
     }
 
     /**
@@ -396,12 +396,6 @@ abstract class BaseSession
     }
 
     /**
-     * Reads the next message from the underlying transport.
-     * This must be implemented by subclasses and should block until a message is available.
-     */
-    abstract protected function readNextMessage(): JsonRpcMessage;
-
-    /**
      * Starts message processing. For a synchronous model, this might be a no-op or set up resources.
      */
     abstract protected function startMessageProcessing(): void;
@@ -410,6 +404,13 @@ abstract class BaseSession
      * Stops message processing. For synchronous model, may close streams or sockets.
      */
     abstract protected function stopMessageProcessing(): void;
+    
+    /**
+     * Reads the next message from the underlying transport.
+     * This must be implemented by subclasses and should block until a message is available.
+     */
+    abstract protected function readNextMessage(): JsonRpcMessage;
+
 
     /**
      * Writes a JsonRpcMessage to the underlying transport.
