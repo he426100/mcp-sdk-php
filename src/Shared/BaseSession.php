@@ -265,7 +265,7 @@ abstract class BaseSession
      * Handles an incoming message. Called by the subclass that implements message processing.
      * @param JsonRpcMessage $message The incoming message.
      */
-    protected function handleIncomingMessage(JsonRpcMessage $message): void
+    public function handleIncomingMessage(JsonRpcMessage $message): void
     {
         $this->validateMessage($message);
 

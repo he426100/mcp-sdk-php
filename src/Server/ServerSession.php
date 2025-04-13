@@ -71,7 +71,6 @@ class ServerSession extends BaseSession
     private array $notificationMethodHandlers = [];
 
     public function __construct(
-        private readonly ChannelInterface $read,
         private readonly ChannelInterface $write,
         private readonly InitializationOptions $initOptions,
         ?LoggerInterface $logger = null
@@ -410,9 +409,7 @@ class ServerSession extends BaseSession
 
     protected function readNextMessage(): JsonRpcMessage
     {
-        $message = $this->read->pop();
-        $this->logger->debug('readNextMessage: ' . json_encode($message));
-        return $message;
+        throw new RuntimeException('Server does not support read message.');
     }
 
     /**
@@ -421,19 +418,5 @@ class ServerSession extends BaseSession
     public function isStarted(): bool
     {
         return $this->isInitialized;
-    }
-
-    /**
-     * Process the next message in the session.
-     */
-    public function processNextMessage(): void
-    {
-        try {
-            $message = $this->readNextMessage();
-            $this->handleIncomingMessage($message);
-        } catch (\Exception $e) {
-            // 处理异常
-            throw new RuntimeException('Error processing message: ' . $e->getMessage(), 0, $e);
-        }
     }
 }

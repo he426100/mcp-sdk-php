@@ -46,7 +46,6 @@ use Mcp\Types\Meta;
 use Mcp\Server\Http\ResponseEmitterInterface;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
-use Mcp\Coroutine\Channel;
 use Mcp\Coroutine\Channel\ChannelInterface;
 use RuntimeException;
 use InvalidArgumentException;
@@ -70,10 +69,6 @@ class SseServerTransport implements Transport
     /** @var LoggerInterface */
     private LoggerInterface $logger;
 
-    /** 模拟python的read_stream和write_stream */
-    private ChannelInterface $read;
-    private ChannelInterface $write;
-
     /**
      * SseServerTransport constructor.
      *
@@ -84,6 +79,7 @@ class SseServerTransport implements Transport
      */
     public function __construct(
         private readonly string $endpoint,
+        private ChannelInterface $read,
         ?LoggerInterface $logger = null
     ) {
         if (empty($endpoint)) {
@@ -91,19 +87,6 @@ class SseServerTransport implements Transport
         }
 
         $this->logger = $logger ?? new NullLogger();
-
-        $this->read = new Channel();
-        $this->write = new Channel();
-    }
-
-    /**
-     * Returns the read and write channels used for message passing.
-     *
-     * @return array{ChannelInterface, ChannelInterface} Array containing [read channel, write channel]
-     */
-    public function getStreams(): array
-    {
-        return [$this->read, $this->write];
     }
 
     /**

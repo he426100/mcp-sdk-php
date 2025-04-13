@@ -58,6 +58,9 @@ class ServerRunner
 {
     private ?object $waitRef = null;
     private Channel $controlSignal;
+    /** 模拟python的read_stream和write_stream */
+    private Channel $read;
+    private Channel $write;
     /** @var array<CoroutineInterface> */
     private array $coroutines = [];
 
@@ -72,6 +75,8 @@ class ServerRunner
         private int $port = 8000,
     ) {
         $this->controlSignal = new Channel(); // 控制信号通道
+        $this->read = new Channel();
+        $this->write = new Channel();
         $this->logger = $logger ?? new NullLogger();
     }
 
@@ -132,10 +137,8 @@ class ServerRunner
             // 启动transport，但不要在transport内部创建协程
             $transport->start();
 
-            list($read, $write) = $transport->getStreams();
             $session = new ServerSession(
-                $read,
-                $write,
+                $this->write,
                 $initOptions,
                 $this->logger
             );
@@ -149,13 +152,13 @@ class ServerRunner
             $session->start();
 
             // 由ServerRunner管理读取消息的协程
-            $this->spawnCoroutine(function () use ($transport, $read): void {
+            $this->spawnCoroutine(function () use ($transport): void {
                 while (true) {
                     try {
                         // 读取消息
                         $message = $transport->readMessage();
                         if ($message !== null) {
-                            $read->push($message);
+                            $this->read->push($message);
                         }
                     } catch (\Exception $e) {
                         $this->logger->error('Error reading message: ' . $e->getMessage());
@@ -172,11 +175,11 @@ class ServerRunner
             });
 
             // 由ServerRunner管理写入消息的协程
-            $this->spawnCoroutine(function () use ($transport, $write): void {
+            $this->spawnCoroutine(function () use ($transport): void {
                 while (true) {
                     try {
                         // 获取并写入消息
-                        $message = $write->pop();
+                        $message = $this->write->pop();
                         if ($message !== null) {
                             $transport->writeMessage($message);
                         }
@@ -195,7 +198,8 @@ class ServerRunner
             $this->spawnCoroutine(function () use ($session): void {
                 while (true) {
                     try {
-                        $session->processNextMessage();
+                        $message = $this->read->pop();
+                        $session->handleIncomingMessage($message);
                     } catch (\Exception $e) {
                         $this->logger->error('Error processing message: ' . $e->getMessage());
                     }
@@ -225,18 +229,15 @@ class ServerRunner
     {
         try {
             // 创建transport
-            $transport = new SseServerTransport('/messages', $this->logger);
+            $transport = new SseServerTransport('/messages', $this->read, $this->logger);
             $this->transportInstance = $transport;
 
             // 启动transport
             $transport->start();
 
-            list($read, $write) = $transport->getStreams();
-
             // 创建session
             $session = new ServerSession(
-                $read,
-                $write,
+                $this->write,
                 $initOptions,
                 $this->logger
             );
@@ -262,10 +263,10 @@ class ServerRunner
             });
 
             // 协程：处理写入消息
-            $this->spawnCoroutine(function () use ($transport, $write): void {
+            $this->spawnCoroutine(function () use ($transport): void {
                 while ($transport->isStarted()) {
                     try {
-                        $message = $write->pop();
+                        $message = $this->write->pop();
                         if ($message !== null) {
                             $transport->writeMessage($message);
                         }
@@ -279,7 +280,8 @@ class ServerRunner
             $this->spawnCoroutine(function () use ($session): void {
                 while ($session->isStarted()) {
                     try {
-                        $session->processNextMessage();
+                        $message = $this->read->pop();
+                        $session->handleIncomingMessage($message);
                     } catch (\Exception $e) {
                         $this->logger->error('Error processing message: ' . $e->getMessage());
                     }

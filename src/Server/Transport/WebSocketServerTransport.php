@@ -48,10 +48,9 @@ use Psr\Log\NullLogger;
 use Ratchet\MessageComponentInterface;
 use Ratchet\ConnectionInterface;
 use Ratchet\WebSocket\WsServerInterface;
+use Mcp\Coroutine\Channel\ChannelInterface;
 use RuntimeException;
 use InvalidArgumentException;
-use Mcp\Coroutine\Channel;
-use Mcp\Coroutine\Channel\ChannelInterface;
 
 /**
  * Class WebSocketServerTransport
@@ -76,33 +75,16 @@ class WebSocketServerTransport implements Transport, MessageComponentInterface, 
     /** @var LoggerInterface */
     private LoggerInterface $logger;
 
-    /** @var Channel */
-    private ChannelInterface $read;
-
-    /** @var Channel */
-    private ChannelInterface $write;
-
     /**
      * WebSocketServerTransport constructor.
      *
      * @param LoggerInterface|null $logger PSR-3 compliant logger.
      */
     public function __construct(
+        private ChannelInterface $read,
         ?LoggerInterface $logger = null
     ) {
         $this->logger = $logger ?? new NullLogger();
-        $this->read = new Channel();
-        $this->write = new Channel();
-    }
-
-    /**
-     * Returns the read and write channels used for message passing.
-     *
-     * @return array{ChannelInterface, ChannelInterface} Array containing [read channel, write channel]
-     */
-    public function getStreams(): array
-    {
-        return [$this->read, $this->write];
     }
 
     /**

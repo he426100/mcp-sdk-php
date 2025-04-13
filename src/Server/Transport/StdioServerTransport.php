@@ -43,8 +43,6 @@ use Mcp\Types\NotificationParams;
 use Mcp\Types\Result;
 use RuntimeException;
 use InvalidArgumentException;
-use Mcp\Coroutine\Channel;
-use Mcp\Coroutine\Channel\ChannelInterface;
 
 /**
  * Class StdioServerTransport
@@ -63,9 +61,6 @@ class StdioServerTransport implements Transport
 
     /** @var bool 是否已启动 */
     private bool $isStarted = false;
-
-    private ChannelInterface $read;
-    private ChannelInterface $write;
 
     /**
      * StdioServerTransport constructor.
@@ -88,19 +83,6 @@ class StdioServerTransport implements Transport
 
         $this->stdin = $stdin ?? STDIN;
         $this->stdout = $stdout ?? STDOUT;
-
-        $this->read = new Channel();
-        $this->write = new Channel();
-    }
-
-    /**
-     * Returns the read and write channels used for message passing.
-     *
-     * @return array{ChannelInterface, ChannelInterface} Array containing [read channel, write channel]
-     */
-    public function getStreams(): array
-    {
-        return [$this->read, $this->write];
     }
 
     /**
@@ -140,13 +122,6 @@ class StdioServerTransport implements Transport
         }
 
         $this->flush();
-
-        if ($this->read) {
-            $this->read->close();
-        }
-        if ($this->write) {
-            $this->write->close();
-        }
         $this->isStarted = false;
     }
 
