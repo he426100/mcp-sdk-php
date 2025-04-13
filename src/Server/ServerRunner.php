@@ -108,8 +108,9 @@ class ServerRunner
                 $signal = $this->controlSignal->pop();
                 if ($signal === 'shutdown') {
                     $this->logger->info('Received shutdown signal, stopping server...');
-                    // 关闭组件
+
                     $this->shutdownServerInstances();
+                    $this->closeChannels();
                     $this->killAllCoroutines();
                 }
             });
@@ -335,6 +336,17 @@ class ServerRunner
         if ($this->sessionInstance) {
             $this->sessionInstance->stop();
         }
+    }
+
+    /**
+     * 
+     * @return void 
+     */
+    private function closeChannels()
+    {
+        $this->read->close();
+        $this->write->close();
+        $this->controlSignal->close();
     }
 
     /**
