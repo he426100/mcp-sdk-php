@@ -26,4 +26,15 @@ class Swow extends Coroutine implements CoroutineInterface
     {
         return $this->getId();
     }
+
+    /**
+     * 
+     * @inheritDoc
+     */
+    public function cancel(): void
+    {
+        if ($this->isExecuting()) {
+            $this->kill();
+        }
+    }
 }

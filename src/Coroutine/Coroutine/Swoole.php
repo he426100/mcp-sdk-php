@@ -36,7 +36,7 @@ class Swoole implements CoroutineInterface
      * 
      * @inheritDoc
      */
-    public function kill(): void
+    public function cancel(): void
     {
         Coroutine::cancel($this->id);
     }

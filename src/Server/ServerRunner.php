@@ -356,7 +356,7 @@ class ServerRunner
     {
         foreach ($this->coroutines as $coroutine) {
             try {
-                $coroutine->kill();
+                $coroutine->cancel();
             } catch (\Throwable $e) {
                 $this->logger->error('Error killing coroutine: ' . $e->getMessage());
             }

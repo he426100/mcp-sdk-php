@@ -53,9 +53,9 @@ class Coroutine implements CoroutineInterface
     /**
      * @inheritDoc
      */
-    public function kill(): void
+    public function cancel(): void
     {
-        $this->driver->kill();
+        $this->driver->cancel();
     }
 
     /**

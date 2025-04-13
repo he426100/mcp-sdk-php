@@ -31,5 +31,5 @@ interface CoroutineInterface
      * 
      * @return void 
      */
-    public function kill(): void;
+    public function cancel(): void;
 }
