@@ -33,6 +33,7 @@ use Mcp\Types\JsonRpcMessage;
 use Mcp\Types\RequestId;
 use Mcp\Shared\McpError;
 use Mcp\Shared\ErrorData;
+use Mcp\Shared\ErrorCode;
 use Mcp\Shared\BaseSession;
 use Mcp\Types\JsonRpcErrorObject;
 use Mcp\Types\JSONRPCRequest;
@@ -178,13 +179,13 @@ class WebSocketServerTransport implements Transport, MessageComponentInterface, 
         try {
             $data = json_decode($msg, true, 512, JSON_THROW_ON_ERROR);
         } catch (\JsonException $e) {
-            $this->sendError($from, -32700, 'Parse error: ' . $e->getMessage());
+            $this->sendError($from, ErrorCode::PARSE_ERROR, 'Parse error: ' . $e->getMessage());
             return;
         }
 
         // Validate 'jsonrpc' field
         if (!isset($data['jsonrpc']) || $data['jsonrpc'] !== '2.0') {
-            $this->sendError($from, -32600, 'Invalid Request: jsonrpc version must be "2.0"');
+            $this->sendError($from, ErrorCode::INVALID_REQUEST, 'Invalid Request: jsonrpc version must be "2.0"');
             return;
         }
 
@@ -379,7 +380,7 @@ class WebSocketServerTransport implements Transport, MessageComponentInterface, 
             $errorData = $data['error'];
             if (!isset($errorData['code']) || !isset($errorData['message'])) {
                 throw new McpError(new ErrorData(
-                    code: -32600,
+                    code: ErrorCode::INVALID_REQUEST,
                     message: 'Invalid Request: error object must contain code and message'
                 ));
             }
@@ -440,7 +441,7 @@ class WebSocketServerTransport implements Transport, MessageComponentInterface, 
         } else {
             // Invalid message structure
             throw new McpError(new ErrorData(
-                code: -32600,
+                code: ErrorCode::INVALID_REQUEST,
                 message: 'Invalid Request: Could not determine message type'
             ));
         }

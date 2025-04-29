@@ -49,6 +49,7 @@ use Psr\Log\NullLogger;
 use Mcp\Coroutine\Channel\ChannelInterface;
 use RuntimeException;
 use InvalidArgumentException;
+use Mcp\Shared\ErrorCode;
 
 /**
  * Class SseServerTransport
@@ -179,7 +180,7 @@ class SseServerTransport implements Transport
 
         if (!isset($this->sessions[$sessionId])) {
             throw new McpError(new ErrorData(
-                code: -32001,
+                code: ErrorCode::SESSION_NOT_FOUND,
                 message: 'Session not found'
             ));
         }
@@ -188,7 +189,7 @@ class SseServerTransport implements Transport
             $data = json_decode($content, true, 512, JSON_THROW_ON_ERROR);
         } catch (\JsonException $e) {
             throw new McpError(new ErrorData(
-                code: -32700,
+                code: ErrorCode::PARSE_ERROR,
                 message: 'Parse error: ' . $e->getMessage()
             ));
         }
@@ -196,7 +197,7 @@ class SseServerTransport implements Transport
         // Validate 'jsonrpc' field
         if (!isset($data['jsonrpc']) || $data['jsonrpc'] !== '2.0') {
             throw new McpError(new ErrorData(
-                code: -32600,
+                code: ErrorCode::INVALID_REQUEST,
                 message: 'Invalid Request: jsonrpc version must be "2.0"'
             ));
         }
@@ -219,7 +220,7 @@ class SseServerTransport implements Transport
                 $errorData = $data['error'];
                 if (!isset($errorData['code']) || !isset($errorData['message'])) {
                     throw new McpError(new ErrorData(
-                        code: -32600,
+                        code: ErrorCode::INVALID_REQUEST,
                         message: 'Invalid Request: error object must contain code and message'
                     ));
                 }
@@ -281,7 +282,7 @@ class SseServerTransport implements Transport
             } else {
                 // Invalid message structure
                 throw new McpError(new ErrorData(
-                    code: -32600,
+                    code: ErrorCode::INVALID_REQUEST,
                     message: 'Invalid Request: Could not determine message type'
                 ));
             }
@@ -296,7 +297,7 @@ class SseServerTransport implements Transport
             throw $e;
         } catch (\Exception $e) {
             throw new McpError(new ErrorData(
-                code: -32700,
+                code: ErrorCode::PARSE_ERROR,
                 message: 'Parse error: ' . $e->getMessage()
             ));
         }

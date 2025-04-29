@@ -33,6 +33,7 @@ use Mcp\Types\JsonRpcMessage;
 use Mcp\Types\RequestId;
 use Mcp\Shared\McpError;
 use Mcp\Shared\ErrorData as TypesErrorData;
+use Mcp\Shared\ErrorCode;
 use Mcp\Types\JsonRpcErrorObject;
 use Mcp\Types\JSONRPCRequest;
 use Mcp\Types\JSONRPCNotification;
@@ -165,7 +166,7 @@ class StdioServerTransport implements Transport
             // JSON parse error
             throw new McpError(
                 new TypesErrorData(
-                    code: -32700,
+                    code: ErrorCode::PARSE_ERROR,
                     message: 'Parse error: ' . $e->getMessage()
                 )
             );
@@ -175,7 +176,7 @@ class StdioServerTransport implements Transport
         if (!isset($data['jsonrpc']) || $data['jsonrpc'] !== '2.0') {
             throw new McpError(
                 new TypesErrorData(
-                    code: -32600,
+                    code: ErrorCode::INVALID_REQUEST,
                     message: 'Invalid Request: jsonrpc version must be "2.0"'
                 )
             );
@@ -200,7 +201,7 @@ class StdioServerTransport implements Transport
                 if (!isset($errorData['code']) || !isset($errorData['message'])) {
                     throw new McpError(
                         new TypesErrorData(
-                            code: -32600,
+                            code: ErrorCode::INVALID_REQUEST,
                             message: 'Invalid Request: error object must contain code and message'
                         )
                     );
@@ -271,7 +272,7 @@ class StdioServerTransport implements Transport
                 // Invalid message structure
                 throw new McpError(
                     new TypesErrorData(
-                        code: -32600,
+                        code: ErrorCode::INVALID_REQUEST,
                         message: 'Invalid Request: Could not determine message type'
                     )
                 );
@@ -283,7 +284,7 @@ class StdioServerTransport implements Transport
             // Other exceptions become parse errors
             throw new McpError(
                 new TypesErrorData(
-                    code: -32700,
+                    code: ErrorCode::PARSE_ERROR,
                     message: 'Parse error: ' . $e->getMessage()
                 )
             );
